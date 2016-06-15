@@ -6,8 +6,17 @@
 
 library ("XLConnect")
 
+#
+# Configuration
+#
+input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-05.xlsx"
+output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv"
+
+#
+# Setup
+#
 datev <- data.frame (
-    "Umsatz (ohne Soll/Haben-Kz)" = double (0),       # 0
+    "Umsatz (ohne Soll/Haben-Kz)" = character (0),    # 0
     "Soll/Haben-Kennzeichen" = character (0),         # 1
     "WKZ Umsatz" = double (0),                        # 2
     "Kurs" = double (0),                              # 3
@@ -128,7 +137,7 @@ datev <- data.frame (
 
 convertDate <- function (date) {
 	d = as.POSIXlt (date)
-	return (sprintf ("%02d%02d", d$mon, d$year - 100))
+	return (sprintf ("%02d%02d", d$mon + 1, d$year - 100))
 }
 
 fillCommonFields <- function (sheet, title) {
@@ -140,11 +149,11 @@ fillCommonFields <- function (sheet, title) {
 		datev[row,]$'Beleginfo - Art 1'            <<- "Art"
 		datev[row,]$'Beleginfo - Inhalt 1'         <<- title
 
-		datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'  <<- abs (line$Gesamtpreis.brutto)
-		if (line$Gesamtpreis.brutto > 0) {
+		datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'  <<- format (round (abs (line$Gesamtpreis.brutto), 2), nsmall=2, decimal.mark=",")
+		if (line$Gesamtpreis.brutto >= 0) {
 			datev[row,]$'Soll/Haben-Kennzeichen' <<- "H"
 		}
--		else {
+		else {
 			datev[row,]$'Soll/Haben-Kennzeichen' <<- "S"
 		}
 
@@ -152,6 +161,8 @@ fillCommonFields <- function (sheet, title) {
 		datev[row,]$'Buchungstext'                 <<- line$Position
 		datev[row,]$'Beleginfo - Art 2'            <<- "Rechnungsnummer"
 		datev[row,]$'Beleginfo - Inhalt 2'         <<- line$Rechnungsnummer
+		datev[row,]$'Beleginfo - Art 3'            <<- "Rechnungsdatum"
+		datev[row,]$'Beleginfo - Inhalt 3'         <<- format (line$Rechnungsdatum, "%d.%m.%Y")
 		datev[row,]$'Zahlweise'                    <<- line$Zahlungsweise
 		datev[row,]$'EU-Steuersatz'                <<- line$Steuersatz
 	}
@@ -161,29 +172,42 @@ fillCommonFields <- function (sheet, title) {
 # Import sheets
 #
 
-sheet.leistungen <- readWorksheetFromFile ("e:/test/export.xlsx", sheet=1)
+sheet.leistungen <- readWorksheetFromFile (input_file, sheet=1)
 fillCommonFields (sheet.leistungen, "Leistungen")
 
-sheet.medikamente.angewendet <- readWorksheetFromFile ("e:/test/export.xlsx", sheet=2)
+sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet=2)
 fillCommonFields (sheet.medikamente.angewendet, "Medikamente (angewendet)")
 
-sheet.medikamente.abgegeben <- readWorksheetFromFile ("e:/test/export.xlsx", sheet=3)
+sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet=3)
 fillCommonFields (sheet.medikamente.abgegeben, "Medikamente (abgegeben)")
 
-sheet.produkte <- readWorksheetFromFile ("e:/test/export.xlsx", sheet=4)
+sheet.produkte <- readWorksheetFromFile (input_file, sheet=4)
 fillCommonFields (sheet.produkte, "Produkte")
 
 #
 # Write everything out
 #
-handle <- file ('e:/test/output.csv', encoding="UTF-8")
-write.table (datev, file=handle, row.names=FALSE, na="", sep=",")
+handle <- file (output_file, encoding="UTF-8")
+write.table (datev, file=handle, row.names=FALSE, na="", sep=";", dec=",")
 
 #
 # Print some control values
 #
-soll  <- sum (datev[datev$'Soll/Haben-Kennzeichen' == 'S']$'Umsatz (ohne Soll/Haben-Kz)')
-haben <- sum (datev[datev$'Soll/Haben-Kennzeichen' == 'H']$'Umsatz (ohne Soll/Haben-Kz)')
+soll <- 0
+haben <- 0
+
+for (row in 1:nrow (datev)) {
+	if (datev[row,]$'Soll/Haben-Kennzeichen' == 'S') {
+		soll <<- soll + datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'
+	}	
+	if (datev[row,]$'Soll/Haben-Kennzeichen' == 'H') {
+		haben <<- haben + datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'
+	}	
+}
+
+
+#soll  <- sum (datev[datev$'Soll/Haben-Kennzeichen' == 'S']$'Umsatz (ohne Soll/Haben-Kz)')
+#haben <- sum (datev[datev$'Soll/Haben-Kennzeichen' == 'H']$'Umsatz (ohne Soll/Haben-Kz)')
 
 print ("Summary")
 print ("-------------------------------")
