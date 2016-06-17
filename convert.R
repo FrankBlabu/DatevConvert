@@ -16,7 +16,7 @@ output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv
 # Setup
 #
 datev <- data.frame (
-    "Umsatz (ohne Soll/Haben-Kz)" = character (0),    # 0
+    "Umsatz (ohne Soll/Haben-Kz)" = numeric (0),      # 0
     "Soll/Haben-Kennzeichen" = character (0),         # 1
     "WKZ Umsatz" = double (0),                        # 2
     "Kurs" = double (0),                              # 3
@@ -149,7 +149,7 @@ fillCommonFields <- function (sheet, title) {
 		datev[row,]$'Beleginfo - Art 1'            <<- "Art"
 		datev[row,]$'Beleginfo - Inhalt 1'         <<- title
 
-		datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'  <<- format (round (abs (line$Gesamtpreis.brutto), 2), nsmall=2, decimal.mark=",")
+		datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'  <<- abs (line$Gesamtpreis.brutto)
 		if (line$Gesamtpreis.brutto >= 0) {
 			datev[row,]$'Soll/Haben-Kennzeichen' <<- "H"
 		}
@@ -185,29 +185,13 @@ sheet.produkte <- readWorksheetFromFile (input_file, sheet=4)
 fillCommonFields (sheet.produkte, "Produkte")
 
 #
-# Write everything out
-#
-handle <- file (output_file, encoding="UTF-8")
-write.table (datev, file=handle, row.names=FALSE, na="", sep=";", dec=",")
-
-#
 # Print some control values
 #
 soll <- 0
 haben <- 0
 
-for (row in 1:nrow (datev)) {
-	if (datev[row,]$'Soll/Haben-Kennzeichen' == 'S') {
-		soll <<- soll + datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'
-	}	
-	if (datev[row,]$'Soll/Haben-Kennzeichen' == 'H') {
-		haben <<- haben + datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'
-	}	
-}
-
-
-#soll  <- sum (datev[datev$'Soll/Haben-Kennzeichen' == 'S']$'Umsatz (ohne Soll/Haben-Kz)')
-#haben <- sum (datev[datev$'Soll/Haben-Kennzeichen' == 'H']$'Umsatz (ohne Soll/Haben-Kz)')
+soll  <- sum (datev[datev$'Soll/Haben-Kennzeichen' == 'S',]$'Umsatz (ohne Soll/Haben-Kz)')
+haben <- sum (datev[datev$'Soll/Haben-Kennzeichen' == 'H',]$'Umsatz (ohne Soll/Haben-Kz)')
 
 print ("Summary")
 print ("-------------------------------")
@@ -215,4 +199,12 @@ print (paste ("Soll  :", soll, sep=" "))
 print (paste ("Haben :", haben, sep=" "))
 
 
+#
+# Write everything out
+#
+output <- datev
 
+output$'Umsatz (ohne Soll/Haben-Kz)' <- format (round (output$'Umsatz (ohne Soll/Haben-Kz)', 2), nsmall=2, decimal.mark=",")
+
+handle <- file (output_file, encoding="UTF-8")
+write.table (output, file=handle, row.names=FALSE, na="", sep=";", dec=",")
