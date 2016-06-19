@@ -165,11 +165,30 @@ fillCommonFields <- function (sheet, title) {
 		datev[row,]$'Beleginfo - Inhalt 3'         <<- format (line$Rechnungsdatum, "%d.%m.%Y")
 		datev[row,]$'Zahlweise'                    <<- line$Zahlungsweise
 		datev[row,]$'EU-Steuersatz'                <<- line$Steuersatz
+
+		if (!is.na (customer.ids[line$Rechnungsnummer])) {
+			datev[row,]$'Konto' <<- customer.ids[line$Rechnungsnummer]
+		}
 	}
 }
 
 #
-# Import sheets
+# Import sheet 'Zahlungen' and extract customer ids
+#
+sheet.zahlungen <- readWorksheetFromFile (input_file, sheet=5)
+
+customer.ids = c()
+
+for (i in 1:nrow (sheet.zahlungen)) {
+	line = sheet.zahlungen[i,]
+
+	if (!is.na (line$Rechnungsnummer) & !is.na (line$Kundennummer)) {
+		customer.ids[line$Rechnungsnummer] <- line$Kundennummer
+	}
+}
+
+#
+# Import sheets data relevant
 #
 
 sheet.leistungen <- readWorksheetFromFile (input_file, sheet=1)
