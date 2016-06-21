@@ -9,8 +9,13 @@ library ("XLConnect")
 #
 # Configuration
 #
-input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-05.xlsx"
-output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv"
+
+#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-05.xlsx"
+input_file  <- "e:/test/convert/datevconvert/export.xlsx"
+
+#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv"
+output_file <- "e:/test/convert/datevconvert/datev.csv"
+
 
 #
 # Setup
@@ -204,7 +209,17 @@ sheet.produkte <- readWorksheetFromFile (input_file, sheet=4)
 fillCommonFields (sheet.produkte, "Produkte")
 
 #
-# Print some control values
+# Write everything out
+#
+output <- datev
+
+output$'Umsatz (ohne Soll/Haben-Kz)' <- format (round (output$'Umsatz (ohne Soll/Haben-Kz)', 2), nsmall=2, decimal.mark=",")
+
+handle <- file (output_file, encoding="UTF-8")
+write.table (output, file=handle, row.names=FALSE, na="", sep=";", dec=",")
+
+#
+# Print some statistics
 #
 soll <- 0
 haben <- 0
@@ -217,13 +232,9 @@ print ("-------------------------------")
 print (paste ("Soll  :", soll, sep=" "))
 print (paste ("Haben :", haben, sep=" "))
 
+konto.sum <- c ()
 
-#
-# Write everything out
-#
-output <- datev
+for (i in levels (factor (datev$Konto))) 
+	konto.sum[i] <- sum (datev[datev$Konto == i & !is.na (datev$Konto),]$'Umsatz (ohne Soll/Haben-Kz)')
 
-output$'Umsatz (ohne Soll/Haben-Kz)' <- format (round (output$'Umsatz (ohne Soll/Haben-Kz)', 2), nsmall=2, decimal.mark=",")
-
-handle <- file (output_file, encoding="UTF-8")
-write.table (output, file=handle, row.names=FALSE, na="", sep=";", dec=",")
+#print (konto.sum)
