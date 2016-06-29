@@ -10,11 +10,11 @@ library ("XLConnect")
 # Configuration
 #
 
-#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-05.xlsx"
-input_file  <- "e:/test/convert/datevconvert/export.xlsx"
+input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-05.xlsx"
+#input_file  <- "e:/test/convert/datevconvert/export.xlsx"
 
-#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv"
-output_file <- "e:/test/convert/datevconvert/datev.csv"
+output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv"
+#output_file <- "e:/test/convert/datevconvert/datev.csv"
 
 
 #
@@ -142,7 +142,7 @@ datev <- data.frame (
 
 convertDate <- function (date) {
 	d = as.POSIXlt (date)
-	return (sprintf ("%02d%02d", d$mon + 1, d$year - 100))
+	return (sprintf ("%02d%02d", d$mday, d$mon + 1))
 }
 
 fillCommonFields <- function (sheet, title) {
@@ -151,6 +151,7 @@ fillCommonFields <- function (sheet, title) {
 	
 		row = nrow(datev) + 1
 
+		datev[row,]$'Belegfeld 1'                  <<- line$Rechnungsnummer
 		datev[row,]$'Beleginfo - Art 1'            <<- "Art"
 		datev[row,]$'Beleginfo - Inhalt 1'         <<- title
 
@@ -171,6 +172,12 @@ fillCommonFields <- function (sheet, title) {
 		datev[row,]$'Zahlweise'                    <<- line$Zahlungsweise
 		datev[row,]$'EU-Steuersatz'                <<- line$Steuersatz
 
+		if (line$Steuersatz == 7.0)
+			datev[row,]$'BU-Schlüssel' <<- 2
+		else if (line$Steuersatz == 19.0)
+			datev[row,]$'BU-Schlüssel' <<- 3
+
+		datev[row,]$'USt-Schlüssel (Anzahlungen)'  <<- 0
 		if (!is.na (customer.ids[line$Rechnungsnummer])) {
 			datev[row,]$'Konto' <<- customer.ids[line$Rechnungsnummer]
 		}
