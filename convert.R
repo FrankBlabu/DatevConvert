@@ -10,11 +10,11 @@ library ("XLConnect")
 # Configuration
 #
 
-input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-05.xlsx"
-#input_file  <- "e:/test/convert/datevconvert/export.xlsx"
+#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-05.xlsx"
+input_file  <- "e:/test/convert/datevconvert/export-2016-06.xlsx"
 
-output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv"
-#output_file <- "e:/test/convert/datevconvert/datev.csv"
+#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv"
+output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
 
 
 #
@@ -145,7 +145,11 @@ convertDate <- function (date) {
 	return (sprintf ("%02d%02d", d$mday, d$mon + 1))
 }
 
-fillCommonFields <- function (sheet, title) {
+trim <- function (text) {
+	sub ("^\\s+", "", text)
+}
+
+fillCommonFields <- function (sheet, title, account7, account19) {
 	for (i in 1:nrow (sheet)) {
 		line = sheet[i,]
 	
@@ -172,10 +176,14 @@ fillCommonFields <- function (sheet, title) {
 		datev[row,]$'Zahlweise'                    <<- line$Zahlungsweise
 		datev[row,]$'EU-Steuersatz'                <<- line$Steuersatz
 
-		if (line$Steuersatz == 7.0)
+		if (line$Steuersatz == 7.0) {
 			datev[row,]$'BU-Schlüssel' <<- 2
-		else if (line$Steuersatz == 19.0)
+			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account7
+		}
+		else if (line$Steuersatz == 19.0) {
 			datev[row,]$'BU-Schlüssel' <<- 3
+			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account19
+		}
 
 		datev[row,]$'USt-Schlüssel (Anzahlungen)'  <<- 0
 		if (!is.na (customer.ids[line$Rechnungsnummer])) {
@@ -204,26 +212,26 @@ for (i in 1:nrow (sheet.zahlungen)) {
 #
 
 sheet.leistungen <- readWorksheetFromFile (input_file, sheet=1)
-fillCommonFields (sheet.leistungen, "Leistungen")
+fillCommonFields (sheet.leistungen, title="Leistungen", account7=1000, account19=1000)
 
 sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet=2)
-fillCommonFields (sheet.medikamente.angewendet, "Medikamente (angewendet)")
+fillCommonFields (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account7=8011, account19=8014)
 
 sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet=3)
-fillCommonFields (sheet.medikamente.abgegeben, "Medikamente (abgegeben)")
+fillCommonFields (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account7=8021, account19=8021)
 
 sheet.produkte <- readWorksheetFromFile (input_file, sheet=4)
-fillCommonFields (sheet.produkte, "Produkte")
+fillCommonFields (sheet.produkte, title="Produkte", account7=8031, account19=8034)
 
 #
 # Write everything out
 #
 output <- datev
 
-output$'Umsatz (ohne Soll/Haben-Kz)' <- format (round (output$'Umsatz (ohne Soll/Haben-Kz)', 2), nsmall=2, decimal.mark=",")
+output$'Umsatz (ohne Soll/Haben-Kz)' <- trim (format (round (output$'Umsatz (ohne Soll/Haben-Kz)', 2), nsmall=2, decimal.mark=","))
 
-handle <- file (output_file, encoding="UTF-8")
-write.table (output, file=handle, row.names=FALSE, na="", sep=";", dec=",")
+handle <- file (output_file, encoding="latin1")
+write.table (output, file=handle, row.names=FALSE, quote=FALSE, na="", sep=";", dec=",", qmethod=c("escape", "double"))
 
 #
 # Print some statistics
