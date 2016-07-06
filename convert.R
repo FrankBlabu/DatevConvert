@@ -139,16 +139,29 @@ datev <- data.frame (
     "Datum Zuord. Steuerperiode" = as.POSIXct (character (0)), # 115
     stringsAsFactors=FALSE, check.names=FALSE)
 
-
+#
+# Convert POSIXct date into DATEV string like '0416' for 04-2016
+#
 convertDate <- function (date) {
 	d = as.POSIXlt (date)
 	return (sprintf ("%02d%02d", d$mday, d$mon + 1))
 }
 
+#
+# Skip leading blanks
+#
 trim <- function (text) {
 	sub ("^\\s+", "", text)
 }
 
+#
+# Fill DATEV frame with the content of one single exported sheet
+#
+# @param sheet     Imported worksheet
+# @param title     Sheet title
+# @param account7  Account number used for 7% tax entries
+# @param account19 Account number used for 19% tax entries
+#
 fillCommonFields <- function (sheet, title, account7, account19) {
 	for (i in 1:nrow (sheet)) {
 		line = sheet[i,]
@@ -157,6 +170,10 @@ fillCommonFields <- function (sheet, title, account7, account19) {
 
 		turnover <- abs (line$Gesamtpreis.brutto)
 
+		#
+		# Skip lines with 0€ turnover. The import does report an error otherwise, because
+		# this cannot be in the world of finance software.
+		#
 		if (round (turnover, 2) != 0) {
 
 			datev[row,]$'Belegfeld 1'                    <<- line$Rechnungsnummer
@@ -204,11 +221,11 @@ fillCommonFields <- function (sheet, title, account7, account19) {
 }
 
 #
-# Import sheet 'Zahlungen' and extract customer ids
+# Import sheet 'Zahlungen' and extract a customer ids per bill number
 #
 sheet.zahlungen <- readWorksheetFromFile (input_file, sheet=5)
 
-customer.ids = c()
+customer.ids <- c ()
 
 for (i in 1:nrow (sheet.zahlungen)) {
 	line = sheet.zahlungen[i,]
@@ -219,9 +236,8 @@ for (i in 1:nrow (sheet.zahlungen)) {
 }
 
 #
-# Import sheets with relevant data
+# Import sheets with relevant data and add them to the DATEV frame
 #
-
 sheet.leistungen <- readWorksheetFromFile (input_file, sheet=1)
 fillCommonFields (sheet.leistungen, title="Leistungen", account7=8004, account19=8004)
 
@@ -235,7 +251,9 @@ sheet.produkte <- readWorksheetFromFile (input_file, sheet=4)
 fillCommonFields (sheet.produkte, title="Produkte", account7=8031, account19=8034)
 
 #
-# Write everything out
+# Write everything into the output file
+# 
+# The turnover is formatted into a rounded string before.
 #
 output <- datev
 
