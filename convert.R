@@ -27,10 +27,10 @@ library ("XLConnect")
 # Configuration
 #
 
-input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
+input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-05.xlsx"
 #input_file  <- "e:/test/convert/datevconvert/export-2016-05.xlsx"
 
-output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
+output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv"
 #output_file <- "e:/test/convert/datevconvert/datev-2016-05.csv"
 
 account.cash     <- 1001
@@ -270,11 +270,11 @@ addTurnover <- function (sheet, title, account.7, account.19) {
 				account.to <- account.transfer
 			}
 			else {
-				print (paste ("ERROR: Unknown payment kind'", line$Zahlungsweise, "' at ", line$Rechnungsnummer, sep=""))
+				print (paste ("ERROR: Unknown payment kind '", line$Zahlungsweise, "' at ", line$Rechnungsnummer, sep=""))
 			}
 
-			datev[row,]$'Konto'                          <<- account.to
-			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.from
+			datev[row,]$'Konto'                          <<- account.from
+			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.to
 		}
 		else {
 			print (paste ("WARNING: 0€ turnover at", line$Rechnungsnummer, sep=" "))
@@ -302,8 +302,6 @@ addPayment <- function (sheet, title) {
 			# this cannot be in the world of finance software.
 			#
 			if (round (sum, 2) != 0 & is.na (line$Rechnungsnummer)) {
-				print (paste ("XXXX:", line$Betrag, line$Bemerkungen, sum, line$Rechnungsnummer, line$Datum, sep=","))
-
 				datev[row,]$'Belegfeld 1'                  <<- line$Nummer
 				datev[row,]$'Belegdatum'                   <<- convertDate (line$Datum)
 				datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'  <<- sum
@@ -320,13 +318,19 @@ addPayment <- function (sheet, title) {
 				datev[row,]$'Beleginfo - Art 2'            <<- "Bemerkungen"
 				datev[row,]$'Beleginfo - Inhalt 2'         <<- line$Bemerkungen
 				datev[row,]$'Beleginfo - Art 3'            <<- "Benutzername"
-				datev[row,]$'Beleginfo - Inhalt 4'         <<- line$Benutzername
+				datev[row,]$'Beleginfo - Inhalt 3'         <<- line$Benutzername
 				datev[row,]$'Zahlweise'                    <<- line$Zahlungsweise
 				datev[row,]$'EU-Steuersatz'                <<- line$Steuersatz
 				datev[row,]$'USt-Schlüssel (Anzahlungen)'  <<- 0
 
-				datev[row,]$'Konto'                          <<- account.cash
-				datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- 0
+				if (line$Bemerkungen == 'Geld auf Bank') {
+					datev[row,]$'Konto' <<- account.cash
+					datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.bank
+				}
+				else {
+					datev[row,]$'Konto' <<- account.cash
+					datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- 0
+				}
 
 				if (line$Steuersatz == 7.0) {
 					datev[row,]$'BU-Schlüssel' <<- 2
