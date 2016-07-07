@@ -27,12 +27,16 @@ library ("XLConnect")
 # Configuration
 #
 
-#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-05.xlsx"
-input_file  <- "e:/test/convert/datevconvert/export-2016-05.xlsx"
+input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
+#input_file  <- "e:/test/convert/datevconvert/export-2016-05.xlsx"
 
-#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv"
-output_file <- "e:/test/convert/datevconvert/datev-2016-05.csv"
+output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
+#output_file <- "e:/test/convert/datevconvert/datev-2016-05.csv"
 
+account.cash     <- 1001
+account.bank     <- 1360
+account.card     <- 1361
+account.transfer <- 1362
 
 #
 # Setup
@@ -172,14 +176,34 @@ trim <- function (text) {
 }
 
 #
+# Add counter entry
+#
+# @param line         Input line
+# @param row          DATEV frame row number to add
+# @param account.from Where the money comes from
+# @param account.to   Where the mones goes to
+#
+addCounterEntry <- function (line, row, account.from, account.to) {
+	if (datev[row,]$'Soll/Haben-Kennzeichen' == 'H') {
+		datev[row,]$'Soll/Haben-Kennzeichen' <<- 'S'
+	}
+	else {
+		datev[row,]$'Soll/Haben-Kennzeichen' <<- 'H'
+	}
+
+	datev[row,]$'Konto'                          <<- account.from
+	datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.to
+}
+
+#
 # Fill DATEV frame with the content of one single exported sheet
 #
-# @param sheet     Imported worksheet
-# @param title     Sheet title
-# @param account7  Account number used for 7% tax entries
-# @param account19 Account number used for 19% tax entries
+# @param sheet      Imported worksheet
+# @param title      Sheet title
+# @param account.7  Account number used for 7% tax entries
+# @param account.19 Account number used for 19% tax entries
 #
-fillCommonFields <- function (sheet, title, account7, account19) {
+addTurnover <- function (sheet, title, account.7, account.19) {
 	for (i in 1:nrow (sheet)) {
 		line = sheet[i,]
 	
@@ -193,46 +217,127 @@ fillCommonFields <- function (sheet, title, account7, account19) {
 		#
 		if (round (turnover, 2) != 0) {
 
-			datev[row,]$'Belegfeld 1'                    <<- line$Rechnungsnummer
-			datev[row,]$'Beleginfo - Art 1'              <<- "Art"
-			datev[row,]$'Beleginfo - Inhalt 1'           <<- title
+			datev[row,]$'Belegfeld 1'                  <<- line$Rechnungsnummer
+			datev[row,]$'Beleginfo - Art 1'            <<- "Art"
+			datev[row,]$'Beleginfo - Inhalt 1'         <<- title
 
-			datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'    <<- turnover
+			datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'  <<- turnover
 			if (line$Gesamtpreis.brutto >= 0) {
-				datev[row,]$'Soll/Haben-Kennzeichen'   <<- "H"
+				datev[row,]$'Soll/Haben-Kennzeichen' <<- "H"
 			}
 			else {
-				datev[row,]$'Soll/Haben-Kennzeichen'   <<- "S"
+				datev[row,]$'Soll/Haben-Kennzeichen' <<- "S"
 			}
 
-			datev[row,]$'Belegdatum'                     <<- convertDate (line$Rechnungsdatum)
-			datev[row,]$'Buchungstext'                   <<- line$Position
-			datev[row,]$'Beleginfo - Art 2'              <<- "Rechnungsnummer"
-			datev[row,]$'Beleginfo - Inhalt 2'           <<- line$Rechnungsnummer
-			datev[row,]$'Beleginfo - Art 3'              <<- "Rechnungsdatum"
-			datev[row,]$'Beleginfo - Inhalt 3'           <<- format (line$Rechnungsdatum, "%d.%m.%Y")
-			datev[row,]$'Zahlweise'                      <<- line$Zahlungsweise
-			datev[row,]$'EU-Steuersatz'                  <<- line$Steuersatz
-			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- 1000
-
-			if (line$Steuersatz == 7.0) {
-				datev[row,]$'BU-Schlüssel' <<- 2
-				datev[row,]$'Konto'        <<- account7
-			}
-			else if (line$Steuersatz == 19.0) {
-				datev[row,]$'BU-Schlüssel' <<- 3
-				datev[row,]$'Konto'        <<- account19
-			}
-
+			datev[row,]$'Belegdatum'                   <<- convertDate (line$Rechnungsdatum)
+			datev[row,]$'Buchungstext'                 <<- line$Position
+			datev[row,]$'Beleginfo - Art 2'            <<- "Rechnungsnummer"
+			datev[row,]$'Beleginfo - Inhalt 2'         <<- line$Rechnungsnummer
+			datev[row,]$'Beleginfo - Art 3'            <<- "Rechnungsdatum"
+			datev[row,]$'Beleginfo - Inhalt 3'         <<- format (line$Rechnungsdatum, "%d.%m.%Y")
+			datev[row,]$'Zahlweise'                    <<- line$Zahlungsweise
+			datev[row,]$'EU-Steuersatz'                <<- line$Steuersatz
 			datev[row,]$'USt-Schlüssel (Anzahlungen)'  <<- 0
 
 			if (!is.na (customer.ids[line$Rechnungsnummer])) {
 				datev[row,]$'Beleginfo - Art 4'    <<- "Kundennummer"
 				datev[row,]$'Beleginfo - Inhalt 4' <<- customer.ids[line$Rechnungsnummer]
 			}
+
+			#
+			# Determine from and to account
+			#
+			account.from <- NA
+			account.to <- NA
+
+
+			if (line$Steuersatz == 7.0) {
+				datev[row,]$'BU-Schlüssel' <<- 2
+				account.from <- account.7
+			}
+			else if (line$Steuersatz == 19.0) {
+				datev[row,]$'BU-Schlüssel' <<- 3
+				account.from <- account.19
+			}
+
+			if (line$Zahlungsweise == 'EC Karte') {
+				account.to <- account.card
+			}
+			else if (line$Zahlungsweise == 'Bar') {
+				account.to <- account.cash
+			}
+			else if (line$Zahlungsweise == 'Überweisung') {
+				account.to <- account.transfer
+			}
+			else {
+				print (paste ("ERROR: Unknown payment kind'", line$Zahlungsweise, "' at ", line$Rechnungsnummer, sep=""))
+			}
+
+			datev[row,]$'Konto'                          <<- account.to
+			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.from
 		}
 		else {
 			print (paste ("WARNING: 0€ turnover at", line$Rechnungsnummer, sep=" "))
+		}
+	}
+}
+
+#
+# Add entry for payment from cash account
+#
+# @param sheet Imported worksheet
+# @param title Sheet title
+#
+addPayment <- function (sheet, title) {
+	for (i in 1:nrow (sheet)) {
+		line = sheet[i,]
+	
+		row = nrow(datev) + 1
+
+		if (!is.na (line$Betrag)) {
+			sum <- abs (line$Betrag)
+
+			#
+			# Skip lines with 0€ turnover. The import does report an error otherwise, because
+			# this cannot be in the world of finance software.
+			#
+			if (round (sum, 2) != 0 & is.na (line$Rechnungsnummer)) {
+				print (paste ("XXXX:", line$Betrag, line$Bemerkungen, sum, line$Rechnungsnummer, line$Datum, sep=","))
+
+				datev[row,]$'Belegfeld 1'                  <<- line$Nummer
+				datev[row,]$'Belegdatum'                   <<- convertDate (line$Datum)
+				datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'  <<- sum
+
+				if (line$Betrag >= 0) {
+					datev[row,]$'Soll/Haben-Kennzeichen' <<- "H"
+				}
+				else {
+					datev[row,]$'Soll/Haben-Kennzeichen' <<- "S"
+				}
+				datev[row,]$'Buchungstext'                 <<- line$Bemerkungen
+				datev[row,]$'Beleginfo - Art 1'            <<- "Art"
+				datev[row,]$'Beleginfo - Inhalt 1'         <<- "Barausgabe"
+				datev[row,]$'Beleginfo - Art 2'            <<- "Bemerkungen"
+				datev[row,]$'Beleginfo - Inhalt 2'         <<- line$Bemerkungen
+				datev[row,]$'Beleginfo - Art 3'            <<- "Benutzername"
+				datev[row,]$'Beleginfo - Inhalt 4'         <<- line$Benutzername
+				datev[row,]$'Zahlweise'                    <<- line$Zahlungsweise
+				datev[row,]$'EU-Steuersatz'                <<- line$Steuersatz
+				datev[row,]$'USt-Schlüssel (Anzahlungen)'  <<- 0
+
+				datev[row,]$'Konto'                          <<- account.cash
+				datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- 0
+
+				if (line$Steuersatz == 7.0) {
+					datev[row,]$'BU-Schlüssel' <<- 2
+				}
+				else if (line$Steuersatz == 19.0) {
+					datev[row,]$'BU-Schlüssel' <<- 3
+				}
+			}
+			else if (round (sum, 2) == 0) {
+				print (paste ("WARNING: 0€ payment at", line$Rechnungsnummer, sep=" "))
+			}
 		}
 	}
 }
@@ -256,16 +361,19 @@ for (i in 1:nrow (sheet.zahlungen)) {
 # Import sheets with relevant data and add them to the DATEV frame
 #
 sheet.leistungen <- readWorksheetFromFile (input_file, sheet=1)
-fillCommonFields (sheet.leistungen, title="Leistungen", account7=8004, account19=8004)
+addTurnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
 
 sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet=2)
-fillCommonFields (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account7=8011, account19=8014)
+addTurnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
 
 sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet=3)
-fillCommonFields (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account7=8021, account19=8024)
+addTurnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
 
 sheet.produkte <- readWorksheetFromFile (input_file, sheet=4)
-fillCommonFields (sheet.produkte, title="Produkte", account7=8031, account19=8034)
+addTurnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
+
+sheet.payments <- readWorksheetFromFile (input_file, sheet=6)
+addPayment (sheet.payments, title="Ausgabe")
 
 #
 # Write everything into the output file
