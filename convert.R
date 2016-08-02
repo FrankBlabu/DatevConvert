@@ -27,11 +27,21 @@ library ("XLConnect")
 # Configuration
 #
 
+<<<<<<< local
+#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-05.xlsx"
+input_file  <- "e:/test/convert/datevconvert/export-2016-06.xlsx"
+=======
 input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-05.xlsx"
 #input_file  <- "e:/test/convert/datevconvert/export-2016-05.xlsx"
+>>>>>>> other
 
+<<<<<<< local
+#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv"
+output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
+=======
 output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv"
 #output_file <- "e:/test/convert/datevconvert/datev-2016-05.csv"
+>>>>>>> other
 
 account.cash     <- 1001
 account.bank     <- 1360
