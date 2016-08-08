@@ -27,21 +27,11 @@ library ("XLConnect")
 # Configuration
 #
 
-<<<<<<< local
-#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-05.xlsx"
-input_file  <- "e:/test/convert/datevconvert/export-2016-06.xlsx"
-=======
-input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-05.xlsx"
-#input_file  <- "e:/test/convert/datevconvert/export-2016-05.xlsx"
->>>>>>> other
+#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
+input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-06.xlsx"
 
-<<<<<<< local
-#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv"
+#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
 output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
-=======
-output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv"
-#output_file <- "e:/test/convert/datevconvert/datev-2016-05.csv"
->>>>>>> other
 
 account.cash     <- 1001
 account.bank     <- 1360
@@ -170,6 +160,8 @@ datev <- data.frame (
     "Datum Zuord. Steuerperiode" = as.POSIXct (character (0)), # 115
     stringsAsFactors=FALSE, check.names=FALSE)
 
+
+
 #
 # Convert POSIXct date into DATEV string like '0416' for 04-2016
 #
@@ -270,10 +262,22 @@ addTurnover <- function (sheet, title, account.7, account.19) {
 				account.from <- account.19
 			}
 
+			#
+			# Payments via EC are logged as 'cash'. The daily EC payments will be
+			# exported to another account separately later on.
+			#
 			if (line$Zahlungsweise == 'EC Karte') {
-				account.to <- account.card
+				account.to <- account.cash
 			}
 			else if (line$Zahlungsweise == 'Bar') {
+				account.to <- account.cash
+			}
+	
+			#
+			# Mixed payments EC/cash are transferred into the income account, too.
+			# The tax people want to sort this out later manually.
+			#
+			else if (line$Zahlungsweise == 'EC Karte, Bar' || line$Zahlungsweise == 'Bar, EC Karte') {
 				account.to <- account.cash
 			}
 			else if (line$Zahlungsweise == 'Überweisung') {
@@ -316,12 +320,17 @@ addPayment <- function (sheet, title) {
 				datev[row,]$'Belegdatum'                   <<- convertDate (line$Datum)
 				datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'  <<- sum
 
+				#
+				# Here we transfer money from the main account to some other account.
+				# So a payment is marked as 'H' because of the transfer direction.
+				#
 				if (line$Betrag >= 0) {
-					datev[row,]$'Soll/Haben-Kennzeichen' <<- "H"
-				}
-				else {
 					datev[row,]$'Soll/Haben-Kennzeichen' <<- "S"
 				}
+				else {
+					datev[row,]$'Soll/Haben-Kennzeichen' <<- "H"
+				}
+
 				datev[row,]$'Buchungstext'                 <<- line$Bemerkungen
 				datev[row,]$'Beleginfo - Art 1'            <<- "Art"
 				datev[row,]$'Beleginfo - Inhalt 1'         <<- "Barausgabe"
@@ -342,12 +351,12 @@ addPayment <- function (sheet, title) {
 					datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- 0
 				}
 
-				if (line$Steuersatz == 7.0) {
-					datev[row,]$'BU-Schlüssel' <<- 2
-				}
-				else if (line$Steuersatz == 19.0) {
-					datev[row,]$'BU-Schlüssel' <<- 3
-				}
+				#if (line$Steuersatz == 7.0) {
+				#	datev[row,]$'BU-Schlüssel' <<- 2
+				#}
+				#else if (line$Steuersatz == 19.0) {
+				#	datev[row,]$'BU-Schlüssel' <<- 3
+				#}
 			}
 			else if (round (sum, 2) == 0) {
 				print (paste ("WARNING: 0€ payment at", line$Rechnungsnummer, sep=" "))
@@ -357,7 +366,45 @@ addPayment <- function (sheet, title) {
 }
 
 #
-# Import sheet 'Zahlungen' and extract a customer ids per bill number
+# Withdraw the amount of money gathered via EC card in daily doses
+#
+transfers <- c ()
+
+addDailyCardTransfers <- function () {
+
+	transfers <<- c()
+
+	for (row in 1:nrow (datev)) {
+		line <- datev[row,]
+
+		if (line$'Zahlweise' == 'EC Karte') {
+			date <- line$'Beleginfo - Inhalt 3'
+			sum  <- line$'Umsatz (ohne Soll/Haben-Kz)'
+
+			if (length (transfers) == 0 || is.na (transfers[date]))
+				transfers[date] <<- 0.0
+
+			print (paste (date, sum, sep=", "))
+
+			if (line$'Soll/Haben-Kennzeichen' == "S")
+				transfers[date] <<- transfers[date] - sum
+			else
+				transfers[date] <<- transfers[date] + sum
+		}
+	}
+
+	transfers <<- round (transfers, 2)
+
+	for (i in 1:length (transfers)) {
+		if (transfers[i] < 0.01)
+			transfers[i] <<- 0.0
+	}
+
+	print (transfers)
+}
+
+#
+# Import sheet 'Zahlungen' and extract a customer id per bill number
 #
 sheet.zahlungen <- readWorksheetFromFile (input_file, sheet=5)
 
@@ -388,6 +435,8 @@ addTurnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
 
 sheet.payments <- readWorksheetFromFile (input_file, sheet=6)
 addPayment (sheet.payments, title="Ausgabe")
+
+addDailyCardTransfers ()
 
 #
 # Write everything into the output file
