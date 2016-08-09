@@ -27,11 +27,11 @@ library ("XLConnect")
 # Configuration
 #
 
-input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
-#input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-06.xlsx"
+#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
+input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-06.xlsx"
 
-output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
-#output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
+#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
+output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
 
 account.cash     <- 1001
 account.bank     <- 1360
@@ -49,8 +49,8 @@ datev <- data.frame (
     "Basis-Umsatz" = double (0),                      # 4
     "WKZ Basis-Umsatz" = double (0),                  # 5
     "Konto" = character (0),                          # 6
-    "Gegenkonto (ohne BU-SchlÃ¼ssel)" = character (0), # 7
-    "BU-SchlÃ¼ssel" = character (0),                   # 8
+    "Gegenkonto (ohne BU-Schlüssel)" = character (0), # 7
+    "BU-Schlüssel" = character (0),                   # 8
     "Belegdatum" = character (0),                     # 9
     "Belegfeld 1" = character (0),                    # 10
     "Belegfeld 2" = character (0),                    # 11
@@ -58,7 +58,7 @@ datev <- data.frame (
     "Buchungstext" = character (0),                   # 13
     "Postensperre" = character(0),                    # 14
     "Diverse Adressnummer" = character (0),           # 15
-    "GeschÃ¤ftspartnerbank" = character (0),           # 16
+    "Geschäftspartnerbank" = character (0),           # 16
     "Sachverhalt" = character (0),                    # 17
     "Zinssperre" = character (0),                     # 18
     "Beleglink" = character (0),                      # 19
@@ -85,10 +85,10 @@ datev <- data.frame (
     "EU-Steuersatz" = double (0),                     # 40
     "Abw. Versteuerungsart" = character (0),          # 41
     "Sachverhalt L+L" = character (0),                # 42
-    "FunktionsergÃ¤nzung L+L" = character (0),         # 43
+    "Funktionsergänzung L+L" = character (0),         # 43
     "BU 49 Hauptfunktionstyp" = character (0),        # 44
     "BU 49 Hauptfunktionsnummer" = character (0),     # 45
-    "BU 49 FunktionsergÃ¤nzung" = character (0),       # 46
+    "BU 49 Funktionsergänzung" = character (0),       # 46
     "Zusatzinformation - Art 1" = character (0),      # 47
     "Zusatzinformation- Inhalt 1" = character (0),    # 48
     "Zusatzinformation - Art 2" = character (0),      # 49
@@ -129,7 +129,7 @@ datev <- data.frame (
     "Zusatzinformation- Inhalt 19" = character (0),   # 84
     "Zusatzinformation - Art 20" = character (0),     # 85
     "Zusatzinformation- Inhalt 20" = character (0),   # 86
-    "StÃ¼ck" = integer (0),                            # 87
+    "Stück" = integer (0),                            # 87
     "Gewicht" = double (0),                           # 88
     "Zahlweise" = character (0),                      # 89
     "Forderungsart" = character (0),                  # 90
@@ -138,11 +138,11 @@ datev <- data.frame (
     "Skontotyp" = character (0),                      # 93
     "Auftragsnummer" = character (0),                 # 94
     "Buchungstyp" = character (0),                    # 95
-    "USt-SchlÃ¼ssel (Anzahlungen)" = double (0),       # 96
+    "USt-Schlüssel (Anzahlungen)" = double (0),       # 96
     "EU-Land (Anzahlungen)" = character (0),          # 97
     "Sachverhalt L+L (Anzahlungen)" = double (0),     # 98
     "EU-Steuersatz (Anzahlungen)" = double (0),       # 99
-    "ErlÃ¶skonto (Anzahlungen)" = double (0),          # 100
+    "Erlöskonto (Anzahlungen)" = double (0),          # 100
     "Herkunft-Kz" = double (0),                       # 101
     "Buchungs GUID" = double (0),                     # 102
     "KOST-Datum" = as.POSIXct (character (0)),        # 103
@@ -194,7 +194,7 @@ addCounterEntry <- function (line, row, account.from, account.to) {
 	}
 
 	datev[row,]$'Konto'                          <<- account.from
-	datev[row,]$'Gegenkonto (ohne BU-SchlÃ¼ssel)' <<- account.to
+	datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.to
 }
 
 #
@@ -214,7 +214,7 @@ addTurnover <- function (sheet, title, account.7, account.19) {
 		turnover <- abs (line$Gesamtpreis.brutto)
 
 		#
-		# Skip lines with 0Â€ turnover. The import does report an error otherwise, because
+		# Skip lines with 0€ turnover. The import does report an error otherwise, because
 		# this cannot be in the world of finance software.
 		#
 		if (round (turnover, 2) != 0) {
@@ -239,7 +239,7 @@ addTurnover <- function (sheet, title, account.7, account.19) {
 			datev[row,]$'Beleginfo - Inhalt 3'         <<- format (line$Rechnungsdatum, "%d.%m.%Y")
 			datev[row,]$'Zahlweise'                    <<- line$Zahlungsweise
 			datev[row,]$'EU-Steuersatz'                <<- line$Steuersatz
-			datev[row,]$'USt-SchlÃ¼ssel (Anzahlungen)'  <<- 0
+			datev[row,]$'USt-Schlüssel (Anzahlungen)'  <<- 0
 
 			if (!is.na (customer.ids[line$Rechnungsnummer])) {
 				datev[row,]$'Beleginfo - Art 4'    <<- "Kundennummer"
@@ -252,13 +252,12 @@ addTurnover <- function (sheet, title, account.7, account.19) {
 			account.from <- NA
 			account.to <- NA
 
-
 			if (line$Steuersatz == 7.0) {
-				datev[row,]$'BU-SchlÃ¼ssel' <<- 2
+				datev[row,]$'BU-Schlüssel' <<- 2
 				account.from <- account.7
 			}
 			else if (line$Steuersatz == 19.0) {
-				datev[row,]$'BU-SchlÃ¼ssel' <<- 3
+				datev[row,]$'BU-Schlüssel' <<- 3
 				account.from <- account.19
 			}
 
@@ -280,7 +279,7 @@ addTurnover <- function (sheet, title, account.7, account.19) {
 			else if (line$Zahlungsweise == 'EC Karte, Bar' || line$Zahlungsweise == 'Bar, EC Karte') {
 				account.to <- account.cash
 			}
-			else if (line$Zahlungsweise == 'Ãœberweisung') {
+			else if (line$Zahlungsweise == 'Überweisung') {
 				account.to <- account.transfer
 			}
 			else {
@@ -288,10 +287,10 @@ addTurnover <- function (sheet, title, account.7, account.19) {
 			}
 
 			datev[row,]$'Konto'                          <<- account.from
-			datev[row,]$'Gegenkonto (ohne BU-SchlÃ¼ssel)' <<- account.to
+			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.to
 		}
 		else {
-			print (paste ("WARNING: 0Â€ turnover at", line$Rechnungsnummer, sep=" "))
+			print (paste ("WARNING: 0€ turnover at", line$Rechnungsnummer, sep=" "))
 		}
 	}
 }
@@ -312,7 +311,7 @@ addPayment <- function (sheet, title) {
 			sum <- abs (line$Betrag)
 
 			#
-			# Skip lines with 0Â€ turnover. The import does report an error otherwise, because
+			# Skip lines with 0€ turnover. The import does report an error otherwise, because
 			# this cannot be in the world of finance software.
 			#
 			if (round (sum, 2) != 0 & is.na (line$Rechnungsnummer)) {
@@ -340,26 +339,19 @@ addPayment <- function (sheet, title) {
 				datev[row,]$'Beleginfo - Inhalt 3'         <<- line$Benutzername
 				datev[row,]$'Zahlweise'                    <<- line$Zahlungsweise
 				datev[row,]$'EU-Steuersatz'                <<- line$Steuersatz
-				datev[row,]$'USt-SchlÃ¼ssel (Anzahlungen)'  <<- 0
+				datev[row,]$'USt-Schlüssel (Anzahlungen)'  <<- 0
 
 				if (line$Bemerkungen == 'Geld auf Bank') {
 					datev[row,]$'Konto' <<- account.cash
-					datev[row,]$'Gegenkonto (ohne BU-SchlÃ¼ssel)' <<- account.bank
+					datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.bank
 				}
 				else {
 					datev[row,]$'Konto' <<- account.cash
-					datev[row,]$'Gegenkonto (ohne BU-SchlÃ¼ssel)' <<- 0
+					datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- 0
 				}
-
-				#if (line$Steuersatz == 7.0) {
-				#	datev[row,]$'BU-SchlÃ¼ssel' <<- 2
-				#}
-				#else if (line$Steuersatz == 19.0) {
-				#	datev[row,]$'BU-SchlÃ¼ssel' <<- 3
-				#}
 			}
 			else if (round (sum, 2) == 0) {
-				print (paste ("WARNING: 0Â€ payment at", line$Rechnungsnummer, sep=" "))
+				print (paste ("WARNING: 0€ payment at", line$Rechnungsnummer, sep=" "))
 			}
 		}
 	}
@@ -368,39 +360,25 @@ addPayment <- function (sheet, title) {
 #
 # Withdraw the amount of money gathered via EC card in daily doses
 #
-transfers <- c ()
-
 addDailyCardTransfers <- function () {
 
-	transfers <<- c()
+	ec <- datev[datev$Zahlweise == 'EC Karte',]
+	sums <- tapply (ec$Umsatz, factor (ec$Belegdatum), sum)
 
-	for (row in 1:nrow (datev)) {
-		line <- datev[row,]
+	for (i in 1:length (sums)) {
+		date <- names (sums)[i]
+		sum <- sums[i]
 
-		if (line$'Zahlweise' == 'EC Karte') {
-			date <- line$'Beleginfo - Inhalt 3'
-			sum  <- line$'Umsatz (ohne Soll/Haben-Kz)'
+		if (!is.na (sum) && round (sum, 2) > 0) {
 
-			if (length (transfers) == 0 || is.na (transfers[date]))
-				transfers[date] <<- 0.0
+			row = nrow(datev) + 1	
 
-			print (paste (date, sum, sep=", "))
-
-			if (line$'Soll/Haben-Kennzeichen' == "S")
-				transfers[date] <<- transfers[date] - sum
-			else
-				transfers[date] <<- transfers[date] + sum
+			datev[row,]$'Belegdatum'                  <<- date
+			datev[row,]$'Umsatz (ohne Soll/Haben-Kz)' <<- sum
+			datev[row,]$'Soll/Haben-Kennzeichen'      <<- "S"
+			datev[row,]$'Buchungstext'                <<- "EC-Übertrag"
 		}
 	}
-
-	transfers <<- round (transfers, 2)
-
-	for (i in 1:length (transfers)) {
-		if (transfers[i] < 0.01)
-			transfers[i] <<- 0.0
-	}
-
-	print (transfers)
 }
 
 #
@@ -453,13 +431,7 @@ write.table (output, file=handle, row.names=FALSE, quote=FALSE, na="", sep=";", 
 #
 # Print some statistics
 #
-soll <- 0
-haben <- 0
+print (tapply (datev$Umsatz, factor (datev$Zahlweise), sum))
+print (tapply (datev$Umsatz, factor (datev$'Soll/Haben'), sum))
 
-soll  <- sum (datev[datev$'Soll/Haben-Kennzeichen' == 'S',]$'Umsatz (ohne Soll/Haben-Kz)')
-haben <- sum (datev[datev$'Soll/Haben-Kennzeichen' == 'H',]$'Umsatz (ohne Soll/Haben-Kz)')
 
-print ("Summary")
-print ("-------------------------------")
-print (paste ("Soll  :", soll, sep=" "))
-print (paste ("Haben :", haben, sep=" "))
