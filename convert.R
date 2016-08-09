@@ -27,12 +27,21 @@ library ("XLConnect")
 # Configuration
 #
 
-#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
+#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-05.xlsx"
 input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-06.xlsx"
 
-#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
+#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-05.csv"
 output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
 
+#
+# Input accounts
+#
+account.in.7 = 8031
+account.in.19 = 8034
+
+#
+# Output accounts
+#
 account.cash     <- 1001
 account.bank     <- 1360
 account.card     <- 1361
@@ -178,105 +187,84 @@ trim <- function (text) {
 }
 
 #
-# Add counter entry
+# Fill DATEV frame
 #
-# @param line         Input line
-# @param row          DATEV frame row number to add
-# @param account.from Where the money comes from
-# @param account.to   Where the mones goes to
+# @param sheet Imported worksheet
 #
-addCounterEntry <- function (line, row, account.from, account.to) {
-	if (datev[row,]$'Soll/Haben-Kennzeichen' == 'H') {
-		datev[row,]$'Soll/Haben-Kennzeichen' <<- 'S'
-	}
-	else {
-		datev[row,]$'Soll/Haben-Kennzeichen' <<- 'H'
-	}
-
-	datev[row,]$'Konto'                          <<- account.from
-	datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.to
-}
-
-#
-# Fill DATEV frame with the content of one single exported sheet
-#
-# @param sheet      Imported worksheet
-# @param title      Sheet title
-# @param account.7  Account number used for 7% tax entries
-# @param account.19 Account number used for 19% tax entries
-#
-addTurnover <- function (sheet, title, account.7, account.19) {
+addPayments <- function (sheet) {
 	for (i in 1:nrow (sheet)) {
 		line = sheet[i,]
 
 		row = nrow(datev) + 1
+	
+		if (!is.na (line$Betrag) && round (line$Betrag, 2) != 0) {
 
-		turnover <- abs (line$Gesamtpreis.brutto)
+			turnover <- abs (line$Betrag)
 
-		#
-		# Skip lines with 0€ turnover. The import does report an error otherwise, because
-		# this cannot be in the world of finance software.
-		#
-		if (round (turnover, 2) != 0) {
+			if (!is.na (line$Rechnungsnummer))
+				datev[row,]$'Belegfeld 1'            <<- line$Rechnungsnummer
+			else
+				datev[row,]$'Belegfeld 1'            <<- paste ("Bar: ", line$Benutzername)
 
-			datev[row,]$'Belegfeld 1'                  <<- line$Rechnungsnummer
-			datev[row,]$'Beleginfo - Art 1'            <<- "Art"
-			datev[row,]$'Beleginfo - Inhalt 1'         <<- title
+			datev[row,]$'Beleginfo - Art 1'            <<- "Vorgangsnummer"
+			datev[row,]$'Beleginfo - Inhalt 1'         <<- line$Nummer
 
 			datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'  <<- turnover
-			if (line$Gesamtpreis.brutto >= 0) {
+
+			if (line$Betrag >= 0)
 				datev[row,]$'Soll/Haben-Kennzeichen' <<- "H"
-			}
-			else {
+			else
 				datev[row,]$'Soll/Haben-Kennzeichen' <<- "S"
-			}
 
-			datev[row,]$'Belegdatum'                   <<- convertDate (line$Rechnungsdatum)
-			datev[row,]$'Buchungstext'                 <<- line$Position
-			datev[row,]$'Beleginfo - Art 2'            <<- "Rechnungsnummer"
-			datev[row,]$'Beleginfo - Inhalt 2'         <<- line$Rechnungsnummer
-			datev[row,]$'Beleginfo - Art 3'            <<- "Rechnungsdatum"
-			datev[row,]$'Beleginfo - Inhalt 3'         <<- format (line$Rechnungsdatum, "%d.%m.%Y")
-			datev[row,]$'Zahlweise'                    <<- line$Zahlungsweise
-			datev[row,]$'EU-Steuersatz'                <<- line$Steuersatz
-			datev[row,]$'USt-Schlüssel (Anzahlungen)'  <<- 0
+			datev[row,]$'Belegdatum'                  <<- convertDate (line$Datum)
+			datev[row,]$'Buchungstext'                <<- line$Bemerkungen
+			datev[row,]$'Beleginfo - Art 2'           <<- "Rechnungsnummer"
+			datev[row,]$'Beleginfo - Inhalt 2'        <<- line$Rechnungsnummer
+			datev[row,]$'Beleginfo - Art 3'           <<- "Rechnungsdatum"
+			datev[row,]$'Beleginfo - Inhalt 3'        <<- line$Datum #format (line$Datum, "%d.%m.%Y")
+			datev[row,]$'Zahlweise'                   <<- line$Zahlungsweise
+			datev[row,]$'EU-Steuersatz'               <<- line$Steuersatz
+			datev[row,]$'USt-Schlüssel (Anzahlungen)' <<- 0
+			datev[row,]$'Beleginfo - Art 4'           <<- "Kundennummer"
+			datev[row,]$'Beleginfo - Inhalt 4'        <<- line$Kundennummer
 
-			if (!is.na (customer.ids[line$Rechnungsnummer])) {
-				datev[row,]$'Beleginfo - Art 4'    <<- "Kundennummer"
-				datev[row,]$'Beleginfo - Inhalt 4' <<- customer.ids[line$Rechnungsnummer]
-			}
+			if (line$Steuersatz == 7.0)
+				datev[row,]$'BU-Schlüssel' <<- 2
+			else if (line$Steuersatz == 19.0)
+				datev[row,]$'BU-Schlüssel' <<- 3
 
 			#
-			# Determine from and to account
+			# Determine 'from' account
 			#
 			account.from <- NA
-			account.to <- NA
 
-			if (line$Steuersatz == 7.0) {
-				datev[row,]$'BU-Schlüssel' <<- 2
-				account.from <- account.7
+			if (!is.na (line$Bemerkungen) && line$Bemerkungen == 'Geld auf Bank') {
+				account.from <- account.bank
 			}
-			else if (line$Steuersatz == 19.0) {
-				datev[row,]$'BU-Schlüssel' <<- 3
-				account.from <- account.19
+			else if (!is.na (line$Rechnungsnummer)) {
+				if (line$Steuersatz == 7.0)
+					account.from <- account.in.7
+				else if (line$Steuersatz == 19.0)
+					account.from <- account.in.19
 			}
+			else
+				account.from <- 0
 
+			#
+			# Determine 'to' account
 			#
 			# Payments via EC are logged as 'cash'. The daily EC payments will be
 			# exported to another account separately later on.
 			#
-			if (line$Zahlungsweise == 'EC Karte') {
+			account.to <- NA
+
+			if (!is.na (line$Bemerkungen) && line$Bemerkungen == 'Geld auf Bank') {
+				account.to <- account.cash
+			}
+			else if (line$Zahlungsweise == 'EC Karte') {
 				account.to <- account.cash
 			}
 			else if (line$Zahlungsweise == 'Bar') {
-				account.to <- account.cash
-			}
-
-			#
-			# Mixed payments EC/cash are transferred into the income account, too.
-			# The tax people want to sort this out later manually.
-			#
-			else if (line$Zahlungsweise == 'EC Karte, Bar' || line$Zahlungsweise == 'Bar, EC Karte') {
 				account.to <- account.cash
 			}
 			else if (line$Zahlungsweise == 'Überweisung') {
@@ -289,73 +277,9 @@ addTurnover <- function (sheet, title, account.7, account.19) {
 			datev[row,]$'Konto'                          <<- account.from
 			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.to
 		}
-		else {
-			print (paste ("WARNING: 0€ turnover at", line$Rechnungsnummer, sep=" "))
-		}
 	}
 }
 
-#
-# Add entry for payment from cash account
-#
-# @param sheet Imported worksheet
-# @param title Sheet title
-#
-addPayment <- function (sheet, title) {
-	for (i in 1:nrow (sheet)) {
-		line = sheet[i,]
-
-		row = nrow(datev) + 1
-
-		if (!is.na (line$Betrag)) {
-			sum <- abs (line$Betrag)
-
-			#
-			# Skip lines with 0€ turnover. The import does report an error otherwise, because
-			# this cannot be in the world of finance software.
-			#
-			if (round (sum, 2) != 0 & is.na (line$Rechnungsnummer)) {
-				datev[row,]$'Belegfeld 1'                  <<- line$Nummer
-				datev[row,]$'Belegdatum'                   <<- convertDate (line$Datum)
-				datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'  <<- sum
-
-				#
-				# Here we transfer money from the main account to some other account.
-				# So a payment is marked as 'H' because of the transfer direction.
-				#
-				if (line$Betrag >= 0) {
-					datev[row,]$'Soll/Haben-Kennzeichen' <<- "S"
-				}
-				else {
-					datev[row,]$'Soll/Haben-Kennzeichen' <<- "H"
-				}
-
-				datev[row,]$'Buchungstext'                 <<- line$Bemerkungen
-				datev[row,]$'Beleginfo - Art 1'            <<- "Art"
-				datev[row,]$'Beleginfo - Inhalt 1'         <<- "Barausgabe"
-				datev[row,]$'Beleginfo - Art 2'            <<- "Bemerkungen"
-				datev[row,]$'Beleginfo - Inhalt 2'         <<- line$Bemerkungen
-				datev[row,]$'Beleginfo - Art 3'            <<- "Benutzername"
-				datev[row,]$'Beleginfo - Inhalt 3'         <<- line$Benutzername
-				datev[row,]$'Zahlweise'                    <<- line$Zahlungsweise
-				datev[row,]$'EU-Steuersatz'                <<- line$Steuersatz
-				datev[row,]$'USt-Schlüssel (Anzahlungen)'  <<- 0
-
-				if (line$Bemerkungen == 'Geld auf Bank') {
-					datev[row,]$'Konto' <<- account.cash
-					datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.bank
-				}
-				else {
-					datev[row,]$'Konto' <<- account.cash
-					datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- 0
-				}
-			}
-			else if (round (sum, 2) == 0) {
-				print (paste ("WARNING: 0€ payment at", line$Rechnungsnummer, sep=" "))
-			}
-		}
-	}
-}
 
 #
 # Withdraw the amount of money gathered via EC card in daily doses
@@ -363,6 +287,12 @@ addPayment <- function (sheet, title) {
 addDailyCardTransfers <- function () {
 
 	ec <- datev[datev$Zahlweise == 'EC Karte',]
+
+	for (i in 1:nrow (ec)) {
+		if (!is.na (ec$Soll[i]) && ec$Soll[i] == "S")
+			ec$Umsatz[i] <- ec$Umsatz[i] * -1.0
+	}
+
 	sums <- tapply (ec$Umsatz, factor (ec$Belegdatum), sum)
 
 	for (i in 1:length (sums)) {
@@ -373,47 +303,22 @@ addDailyCardTransfers <- function () {
 
 			row = nrow(datev) + 1	
 
-			datev[row,]$'Belegdatum'                  <<- date
-			datev[row,]$'Umsatz (ohne Soll/Haben-Kz)' <<- sum
-			datev[row,]$'Soll/Haben-Kennzeichen'      <<- "S"
-			datev[row,]$'Buchungstext'                <<- "EC-Übertrag"
+			datev[row,]$'Belegdatum'                     <<- date
+			datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'    <<- sum
+			datev[row,]$'Soll/Haben-Kennzeichen'         <<- "H"
+			datev[row,]$'Buchungstext'                   <<- "EC-Übertrag"
+			datev[row,]$'Konto'                          <<- account.cash
+			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.bank
 		}
-	}
-}
-
-#
-# Import sheet 'Zahlungen' and extract a customer id per bill number
-#
-sheet.zahlungen <- readWorksheetFromFile (input_file, sheet=5)
-
-customer.ids <- c ()
-
-for (i in 1:nrow (sheet.zahlungen)) {
-	line = sheet.zahlungen[i,]
-
-	if (!is.na (line$Rechnungsnummer) & !is.na (line$Kundennummer)) {
-		customer.ids[line$Rechnungsnummer] <- line$Kundennummer
 	}
 }
 
 #
 # Import sheets with relevant data and add them to the DATEV frame
 #
-sheet.leistungen <- readWorksheetFromFile (input_file, sheet=1)
-addTurnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
-
-sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet=2)
-addTurnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
-
-sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet=3)
-addTurnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
-
-sheet.produkte <- readWorksheetFromFile (input_file, sheet=4)
-addTurnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
-
 sheet.payments <- readWorksheetFromFile (input_file, sheet=6)
-addPayment (sheet.payments, title="Ausgabe")
 
+addPayments (sheet.payments)
 addDailyCardTransfers ()
 
 #
