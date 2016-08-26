@@ -27,17 +27,32 @@ library ("XLConnect")
 # Configuration
 #
 
-#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
-input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-06.xlsx"
+input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
+#input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-06.xlsx"
 
-#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
-output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
+output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
+#output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
 
 account.cash     <- 1001
 account.bank     <- 1360
 account.card     <- 1361
 account.transfer <- 1362
 
+#
+# Intermediate frame for listing all entries
+#
+data <- data.frame (
+	"payment.id"   = numeric (0),   # Id of the payment itself
+	"bill.id"      = character (0), # Id of the bill
+	"customer.id"  = character (0), # Id of the customer
+	"date"         = character (0), # Date of payment
+	"amount"       = double (0),    # Amount of money
+	"payment.kind" = character (0), # Kind of payment (cash, card, ...)
+	"remarks"      = character (0), # Payment remarks
+	"responsible"  = character (0), # Name of the responsible person
+	stringsAsFactors=FALSE, check.names=FALSE)
+
+	
 #
 # Setup
 #
@@ -460,29 +475,53 @@ sheet.leistungen <- readWorksheetFromFile (input_file, sheet=1)
 sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet=2)
 sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet=3)
 sheet.produkte <- readWorksheetFromFile (input_file, sheet=4)
-
-sheets <- list (sheet.leistungen, sheet.medikamente.angewendet, sheet.medikamente.abgegeben, sheet.produkte)
-#sheets <- list (sheet.leistungen, sheet.produkte)
-
 sheet.payments <- readWorksheetFromFile (input_file, sheet=5)
 
+sheets <- list (sheet.leistungen, sheet.medikamente.angewendet, sheet.medikamente.abgegeben, sheet.produkte)
+
 payments <- levels (factor (sheet.payments$Zahlungsweise))
-n <- 0lebve
 
-if ("Bar" %in% payments) n <- n + 1
-if ("EC Karte" %in% payments) n <- n + 1
-if ("Überweisung" %in% payments) n <- n + 1
+#
+# Add entries to payment data set
+#
+for (i in 1:nrow (sheet.payments)) {
+	line <- sheet.payments[i,]
 
-print (paste (n, " <--> ", length (payments)))
+	row <- nrow (data) + 1
 
-
-
-#bill.ids = levels (factor (sheet.payments$Rechnungsnummer))
-bill.ids = list ("2016-1251")
-
-for (bill.id in bill.ids) {
-	for (sheet in sheets) {
-		entries <- sheet[sheet$Rechnungsnummer == bill.id,]
-		#print (paste (bill.id, ": ", sum (entries$Gesamtpreis)))
-	}
+	if (!is.na (line$Betrag) && round (abs (line$Betrag), 2) != 0) {
+		data[row,]$payment.id   <- line$Nummer
+		data[row,]$bill.id      <- line$Rechnungsnummer
+		data[row,]$customer.id  <- line$Kundennummer
+		data[row,]$date         <- line$Datum
+		data[row,]$amount       <- round (line$Betrag, 2)
+		data[row,]$payment.kind <- line$Zahlungsweise
+		data[row,]$remarks      <- line$Bemerkungen
+		data[row,]$responsible  <- line$Benutzername
+	}	
 }
+
+#
+# Filter correction entries
+#
+ids <- levels (factor (data$payment.id))
+ids <- ids[grepl ('X$', ids)]
+
+for (id.corrected in ids) {
+	id.wrong <- substr (id.corrected, 1, nchar (id.corrected) - 1)
+
+	sum.wrong <- data[data$payment.id == id.wrong,]$amount
+	sum.corrected <- data[data$payment.id == id.corrected,]$amount
+
+	if (sum.wrong + sum.corrected != 0)
+		stop (paste ("ERROR: Sum/corrected sum do not match for entry ", id.corrected))
+
+	data <- data[data$payment.id != id.wrong,]
+	data <- data[data$payment.id != id.corrected,]	
+}
+
+#
+# Checks: 
+#
+# * Zero sum not allowed
+#
