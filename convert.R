@@ -42,14 +42,15 @@ account.transfer <- 1362
 # Intermediate frame for listing all entries
 #
 data <- data.frame (
-	"payment.id"   = numeric (0),   # Id of the payment itself
-	"bill.id"      = character (0), # Id of the bill
-	"customer.id"  = character (0), # Id of the customer
-	"date"         = character (0), # Date of payment
-	"amount"       = double (0),    # Amount of money
-	"payment.kind" = character (0), # Kind of payment (cash, card, ...)
-	"remarks"      = character (0), # Payment remarks
-	"responsible"  = character (0), # Name of the responsible person
+	"payment.id"    = numeric (0),   # Id of the payment itself
+	"bill.id"       = character (0), # Id of the bill
+	"customer.id"   = character (0), # Id of the customer
+	"date"          = character (0), # Date of payment
+	"amount"        = double (0),    # Amount of money
+	"payment.kind"  = character (0), # Kind of payment (cash, card, ...)
+	"remarks"       = character (0), # Payment remarks
+	"responsible"   = character (0), # Name of the responsible person
+	"account"       = numeric (0),   # Account where the money goes to / came from
 	stringsAsFactors=FALSE, check.names=FALSE)
 
 	
@@ -498,6 +499,12 @@ for (i in 1:nrow (sheet.payments)) {
 		data[row,]$payment.kind <- line$Zahlungsweise
 		data[row,]$remarks      <- line$Bemerkungen
 		data[row,]$responsible  <- line$Benutzername
+
+		if (is.na (data[row,]$remarks))
+			data[row,]$remarks <- ""
+
+		if (is.na (data[row,]$payment.kind))
+			stop (paste ("ERROR: Payment kind not specified for entry", line$Nummer))
 	}	
 }
 
@@ -514,11 +521,36 @@ for (id.corrected in ids) {
 	sum.corrected <- data[data$payment.id == id.corrected,]$amount
 
 	if (sum.wrong + sum.corrected != 0)
-		stop (paste ("ERROR: Sum/corrected sum do not match for entry ", id.corrected))
+		stop (paste ("ERROR: Sum/corrected sum do not match for entry", id.corrected))
 
 	data <- data[data$payment.id != id.wrong,]
 	data <- data[data$payment.id != id.corrected,]	
 }
+
+#
+# Adapt missing account numbers
+#
+data[data$remarks == "Geld auf Bank",]$account <- account.bank
+
+#
+# Add counter entries for each EC card payment
+#
+payments.ec <- data[data$payment.kind == "EC Karte",]
+
+for (i in 1:nrow (payments.ec)) {
+	payment = payments.ec[i,]
+	row <- nrow (data) + 1
+
+	data[row,] <- payment
+	data[row,]$amount       <- -1.0 * payment$amount
+	data[row,]$payment.kind <- "Übertrag"
+	data[row,]$remarks      <- "Umbuchung"
+	data[row,]$responsible  <- NA	
+	data[row,]$account      <- account.card
+}
+
+data <- data[order (data$bill.id),]
+
 
 #
 # Checks: 
