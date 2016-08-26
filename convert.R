@@ -543,7 +543,7 @@ for (i in 1:nrow (payments.ec)) {
 
 	data[row,] <- payment
 	data[row,]$amount       <- -1.0 * payment$amount
-	data[row,]$payment.kind <- "Übertrag"
+	data[row,]$payment.kind <- "Umbuchung"
 	data[row,]$remarks      <- "Umbuchung"
 	data[row,]$responsible  <- NA	
 	data[row,]$account      <- account.card
