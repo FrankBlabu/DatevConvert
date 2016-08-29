@@ -42,20 +42,23 @@ account.transfer <- 1362
 # Intermediate frame for listing all entries
 #
 data <- data.frame (
-	"payment.id"    = numeric (0),   # Id of the payment itself
-	"bill.id"       = character (0), # Id of the bill
-	"customer.id"   = character (0), # Id of the customer
-	"date"          = character (0), # Date of payment
-	"amount"        = double (0),    # Amount of money
-	"payment.kind"  = character (0), # Kind of payment (cash, card, ...)
-	"remarks"       = character (0), # Payment remarks
-	"responsible"   = character (0), # Name of the responsible person
-	"account"       = numeric (0),   # Account where the money goes to / came from
+	"bill.id"          = character (0), # Id of the bill
+	"payment.id"       = numeric (0),   # Id of the payment itself
+	"payment.date"     = character (0), # Date of payment
+	"item.kind"        = character (0), # Kind of item applied/sold
+	"item.date"        = character (0), # Date the item was applied/sold
+	"item.description" = character (0), # Description of the item
+	"item.tax"         = numeric (0),   # Tax of the item
+	"customer.id"      = character (0), # Id of the customer
+	"amount"           = double (0),    # Amount of money
+	"remarks"          = character (0), # Payment remarks
+	"responsible"      = character (0), # Name of the responsible person
+	"account"          = numeric (0),   # Account where the money goes to / came from
 	stringsAsFactors=FALSE, check.names=FALSE)
 
 	
 #
-# Setup
+# Datev frame
 #
 datev <- data.frame (
     "Umsatz (ohne Soll/Haben-Kz)" = numeric (0),      # 0
@@ -214,7 +217,7 @@ addCounterEntry <- function (line, row, account.from, account.to) {
 }
 
 #
-# Fill DATEV frame with the content of one single exported sheet
+# Fill data frame with the content of one single exported sheet
 #
 # @param sheet      Imported worksheet
 # @param title      Sheet title
@@ -223,9 +226,11 @@ addCounterEntry <- function (line, row, account.from, account.to) {
 #
 addTurnover <- function (sheet, title, account.7, account.19) {
 	for (i in 1:nrow (sheet)) {
-		line = sheet[i,]
 
-		row = nrow(datev) + 1
+		line <- sheet[i,]
+		bill.id <- line$Rechnungsnummer
+
+		row = nrow (data) + 1
 
 		turnover <- abs (line$Gesamtpreis.brutto)
 
@@ -234,6 +239,27 @@ addTurnover <- function (sheet, title, account.7, account.19) {
 		# this cannot be in the world of finance software.
 		#
 		if (round (turnover, 2) != 0) {
+
+			data$bill.id          <<- bill.is
+			data$payment.id       <<- NA
+			data$payment.date     <<- NA
+			data$item.kind        <<- title
+			data$item.date        <<- line$Rechnungsdatum
+			data$item.description <<- line$Positon
+			data$item.tax         <<- line$Steuersatz
+			data$amount           <<- round (line$Gesamtpreis.brutto, 2)
+			data$account          <<- NA
+
+			if (!is.na (customer.ids[bill.id]))
+				data$customer.id <<- customer.ids[bill.id]
+
+			if (!is.na (remarks[bill.id]))
+				data$remars <<- remarks[bill.id]
+
+			if (!is.na (responsible[bill.id]))
+				data$remars <<- responsible[bill.id]
+
+
 
 			datev[row,]$'Belegfeld 1'                  <<- line$Rechnungsnummer
 			datev[row,]$'Beleginfo - Art 1'            <<- "Art"
@@ -412,144 +438,93 @@ addDailyCardTransfers <- function () {
 	}
 }
 
-temp <- function () {
-	#
-	# Import sheet 'Zahlungen' and extract a customer id per bill number
-	#
-	sheet.zahlungen <- readWorksheetFromFile (input_file, sheet=5)
+#
+# Import sheet 'Zahlungen' and extract a customer id per bill number
+#
+sheet.zahlungen <- readWorksheetFromFile (input_file, sheet=5)
 
-	customer.ids <- c ()
-	remarks <- c ()
+customer.ids <- c ()
+remarks <- c ()
+responsible <- c ()
+payment.ids <- c ()
+payment.dates <- c()
 
-	for (i in 1:nrow (sheet.zahlungen)) {
-		line = sheet.zahlungen[i,]
+for (i in 1:nrow (sheet.zahlungen)) {
 
-		if (!is.na (line$Rechnungsnummer) & !is.na (line$Kundennummer)) {
-			customer.ids[line$Rechnungsnummer] <- line$Kundennummer
-		}
+	line = sheet.zahlungen[i,]
+	bill.id = line$Rechnungsnummer
 
-		if (!is.na (line$Rechnungsnummer) & !is.na (line$Bemerkungen)) {
-			remarks[line$Rechnungsnummer] <- line$Bemerkungen
-		}
+	if (!is.na (bill.id) & !is.na (line$Kundennummer)) {
+		if (length (customer.ids) > 0 && !is.na (customer.ids[bill.id]))
+			customer.ids[bill.id] <- c (customer.ids[bill.id], line$Kundennummer)
+		else
+			customer.ids[bill.id] <- line$Kundennummer
 	}
 
-	#
-	# Import sheets with relevant data and add them to the DATEV frame
-	#
-	sheet.leistungen <- readWorksheetFromFile (input_file, sheet=1)
-	addTurnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
+	if (!is.na (bill.id) & !is.na (line$Bemerkungen)) {
+		if (length (remarks) > 0 && !is.na (remarks[bill.id]))
+			remarks[bill.id] <- c (remarks[bill.id], line$Bemerkungen)
+		else
+			remarks[bill.id] <- line$Bemerkungen
+	}
 
-	sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet=2)
-	addTurnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
+	if (!is.na (bill.id) & !is.na (line$Benutzername)) {
+		if (length (responsible) > 0 && !is.na (responsible[bill.id]))
+			responsible[bill.id] <- c (responsible[bill.id], line$Benutzername)
+		else
+			responsible[bill.id] <- line$Benutzername
+	}
 
-	sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet=3)
-	addTurnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
+	if (!is.na (bill.id) & !is.na (line$Nummer)) {
+		if (length (payment.ids) > 0 && !is.na (payment.ids[bill.id]))
+			payment.ids[bill.id] <- c (payment.ids[bill.id], line$Nummer)
+		else
+			payment.ids[bill.id] <- line$Nummer
+	}
 
-	sheet.produkte <- readWorksheetFromFile (input_file, sheet=4)
-	addTurnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
-
-	sheet.payments <- readWorksheetFromFile (input_file, sheet=6)
-	addPayment (sheet.payments, title="Ausgabe")
-
-	addDailyCardTransfers ()
-
-	#
-	# Write everything into the output file
-	#
-	# The turnover is formatted into a rounded string before.
-	#
-	output <- datev
-
-	output$'Umsatz (ohne Soll/Haben-Kz)' <- trim (format (round (output$'Umsatz (ohne Soll/Haben-Kz)', 2), nsmall=2, decimal.mark=","))
-
-	handle <- file (output_file, encoding="latin1")
-	write.table (output, file=handle, row.names=FALSE, quote=FALSE, na="", sep=";", dec=",", qmethod=c("escape", "double"))
-
-	#
-	# Print some statistics
-	#
-	print (tapply (datev$Umsatz, factor (datev$Zahlweise), sum))
-	print (tapply (datev$Umsatz, factor (datepaymentsv$'Soll/Haben'), sum))
+	if (!is.na (bill.id) & !is.na (line$Datum)) {
+		if (length (payment.dates) > 0 && !is.na (payment.dates[bill.id]))
+			payment.dates[bill.id] <- c (payment.dates[bill.id], line$Datum)
+		else
+			payment.dates[bill.id] <- line$Datum
+	}
 }
 
+#
+# Import sheets with relevant data and add them to the DATEV frame
+#
 sheet.leistungen <- readWorksheetFromFile (input_file, sheet=1)
+#addTurnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
+
 sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet=2)
+#addTurnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
+
 sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet=3)
+#addTurnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
+
 sheet.produkte <- readWorksheetFromFile (input_file, sheet=4)
-sheet.payments <- readWorksheetFromFile (input_file, sheet=5)
+#addTurnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
 
-sheets <- list (sheet.leistungen, sheet.medikamente.angewendet, sheet.medikamente.abgegeben, sheet.produkte)
+#sheet.payments <- readWorksheetFromFile (input_file, sheet=6)
+#addPayment (sheet.payments, title="Ausgabe")
 
-payments <- levels (factor (sheet.payments$Zahlungsweise))
-
-#
-# Add entries to payment data set
-#
-for (i in 1:nrow (sheet.payments)) {
-	line <- sheet.payments[i,]
-
-	row <- nrow (data) + 1
-
-	if (!is.na (line$Betrag) && round (abs (line$Betrag), 2) != 0) {
-		data[row,]$payment.id   <- line$Nummer
-		data[row,]$bill.id      <- line$Rechnungsnummer
-		data[row,]$customer.id  <- line$Kundennummer
-		data[row,]$date         <- line$Datum
-		data[row,]$amount       <- round (line$Betrag, 2)
-		data[row,]$payment.kind <- line$Zahlungsweise
-		data[row,]$remarks      <- line$Bemerkungen
-		data[row,]$responsible  <- line$Benutzername
-
-		if (is.na (data[row,]$remarks))
-			data[row,]$remarks <- ""
-
-		if (is.na (data[row,]$payment.kind))
-			stop (paste ("ERROR: Payment kind not specified for entry", line$Nummer))
-	}	
-}
+#addDailyCardTransfers ()
 
 #
-# Filter correction entries
+# Write everything into the output file
 #
-ids <- levels (factor (data$payment.id))
-ids <- ids[grepl ('X$', ids)]
-
-for (id.corrected in ids) {
-	id.wrong <- substr (id.corrected, 1, nchar (id.corrected) - 1)
-
-	sum.wrong <- data[data$payment.id == id.wrong,]$amount
-	sum.corrected <- data[data$payment.id == id.corrected,]$amount
-
-	if (sum.wrong + sum.corrected != 0)
-		stop (paste ("ERROR: Sum/corrected sum do not match for entry", id.corrected))
-
-	data <- data[data$payment.id != id.wrong,]
-	data <- data[data$payment.id != id.corrected,]	
-}
-
+# The turnover is formatted into a rounded string before.
 #
-# Adapt missing account numbers
-#
-data[data$remarks == "Geld auf Bank",]$account <- account.bank
+#output <- datev
 
-#
-# Add counter entries for each EC card payment
-#
-payments.ec <- data[data$payment.kind == "EC Karte",]
+#output$'Umsatz (ohne Soll/Haben-Kz)' <- trim (format (round (output$'Umsatz (ohne Soll/Haben-Kz)', 2), nsmall=2, decimal.mark=","))
 
-for (i in 1:nrow (payments.ec)) {
-	payment = payments.ec[i,]
-	row <- nrow (data) + 1
+#handle <- file (output_file, encoding="latin1")
+#write.table (output, file=handle, row.names=FALSE, quote=FALSE, na="", sep=";", dec=",", qmethod=c("escape", "double"))
 
-	data[row,] <- payment
-	data[row,]$amount       <- -1.0 * payment$amount
-	data[row,]$payment.kind <- "Umbuchung"
-	data[row,]$remarks      <- "Umbuchung"
-	data[row,]$responsible  <- NA	
-	data[row,]$account      <- account.card
-}
 
-data <- data[order (data$bill.id),]
+
+#data <- data[order (data$bill.id),]
 
 
 #
