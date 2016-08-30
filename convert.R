@@ -27,11 +27,11 @@ library ("XLConnect")
 # Configuration
 #
 
-input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
-#input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-06.xlsx"
+#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
+input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-06.xlsx"
 
-output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
-#output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
+#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
+output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
 
 account.cash     <- 1001
 account.bank     <- 1360
@@ -449,45 +449,25 @@ responsible <- c ()
 payment.ids <- c ()
 payment.dates <- c()
 
-for (i in 1:nrow (sheet.zahlungen)) {
+payments.all <- sheet.zahlungen[!is.na (sheet.zahlungen$Rechnungsnummer),]
 
-	line = sheet.zahlungen[i,]
-	bill.id = line$Rechnungsnummer
+bill.ids = levels (factor (payments.all$Rechnungsnummer))
 
-	if (!is.na (bill.id) & !is.na (line$Kundennummer)) {
-		if (length (customer.ids) > 0 && !is.na (customer.ids[bill.id]))
-			customer.ids[bill.id] <- c (customer.ids[bill.id], line$Kundennummer)
-		else
-			customer.ids[bill.id] <- line$Kundennummer
-	}
+reduce_vector <- function (v) {
+	v <- v[!is.na (v)]
+	v <- unique (v)
+	return (paste (v, collapse=", "))
+}
 
-	if (!is.na (bill.id) & !is.na (line$Bemerkungen)) {
-		if (length (remarks) > 0 && !is.na (remarks[bill.id]))
-			remarks[bill.id] <- c (remarks[bill.id], line$Bemerkungen)
-		else
-			remarks[bill.id] <- line$Bemerkungen
-	}
+for (bill.id in bill.ids) {
 
-	if (!is.na (bill.id) & !is.na (line$Benutzername)) {
-		if (length (responsible) > 0 && !is.na (responsible[bill.id]))
-			responsible[bill.id] <- c (responsible[bill.id], line$Benutzername)
-		else
-			responsible[bill.id] <- line$Benutzername
-	}
+	payment <- payments.all[payments.all$Rechnungsnummer == bill.id,]
 
-	if (!is.na (bill.id) & !is.na (line$Nummer)) {
-		if (length (payment.ids) > 0 && !is.na (payment.ids[bill.id]))
-			payment.ids[bill.id] <- c (payment.ids[bill.id], line$Nummer)
-		else
-			payment.ids[bill.id] <- line$Nummer
-	}
-
-	if (!is.na (bill.id) & !is.na (line$Datum)) {
-		if (length (payment.dates) > 0 && !is.na (payment.dates[bill.id]))
-			payment.dates[bill.id] <- c (payment.dates[bill.id], line$Datum)
-		else
-			payment.dates[bill.id] <- line$Datum
-	}
+	customer.ids[bill.id]  <- reduce_vector (payment$Kundennummer)
+	remarks[bill.id]       <- reduce_vector (payment$Bemerkungen)
+	responsible[bill.id]   <- reduce_vector (payment$Benutzername)
+	payment.ids[bill.id]   <- reduce_vector (payment$Nummer)
+	payment.dates[bill.id] <- reduce_vector (payment$Datum)
 }
 
 #
