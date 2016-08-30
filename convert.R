@@ -293,59 +293,37 @@ addTurnover <- function (sheet, title, account.7, account.19) {
 # @param title Sheet title
 #
 addPayment <- function (sheet, title) {
-	for (i in 1:nrow (sheet)) {
-		line = sheet[i,]
 
-		row = nrow(datev) + 1
+	s <- sheet[is.na (sheet$Rechnungsnummer),]
 
-		if (!is.na (line$Betrag)) {
-			sum <- abs (line$Betrag)
+	for (i in 1:nrow (s)) {
+		line = s[i,]
 
-			#
-			# Skip lines with 0€ turnover. The import does report an error otherwise, because
-			# this cannot be in the world of finance software.
-			#
-			# Payments without bill number are cash payments
-			#
-			if (round (sum, 2) != 0 & is.na (line$Rechnungsnummer)) {
-				datev[row,]$'Belegfeld 1'                  <<- line$Nummer
-				datev[row,]$'Belegdatum'                   <<- convertDate (line$Datum)
-				datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'  <<- sum
+		row = nrow (data) + 1
 
-				#
-				# Here we transfer money from the main account to some other account.
-				# So a payment is marked as 'H' because of the transfer direction.
-				#
-				if (line$Betrag >= 0) {
-					datev[row,]$'Soll/Haben-Kennzeichen' <<- "S"
-				}
-				else {
-					datev[row,]$'Soll/Haben-Kennzeichen' <<- "H"
-				}
+		#
+		# Skip lines with 0€ turnover. The import does report an error otherwise, because
+		# this cannot be in the world of finance software.
+		#
+		if ( !is.na (line$Betrag) &&
+                  round (abs (line$Betrag), 2) != 0 ) {
 
-				datev[row,]$'Buchungstext'                 <<- line$Bemerkungen
-				datev[row,]$'Beleginfo - Art 1'            <<- "Art"
-				datev[row,]$'Beleginfo - Inhalt 1'         <<- "Barausgabe"
-				datev[row,]$'Beleginfo - Art 2'            <<- "Bemerkungen"
-				datev[row,]$'Beleginfo - Inhalt 2'         <<- line$Bemerkungen
-				datev[row,]$'Beleginfo - Art 3'            <<- "Benutzername"
-				datev[row,]$'Beleginfo - Inhalt 3'         <<- line$Benutzername
-				datev[row,]$'Zahlweise'                    <<- line$Zahlungsweise
-				datev[row,]$'EU-Steuersatz'                <<- line$Steuersatz
-				datev[row,]$'USt-Schlüssel (Anzahlungen)'  <<- 0
+			data[row,]$bill.id          <<- NA
+			data[row,]$payment.id       <<- line$Nummer
+			data[row,]$payment.date     <<- line$Datum
+			data[row,]$item.kind        <<- title
+			data[row,]$item.date        <<- line$Datum
+			data[row,]$item.description <<- line$Bemerkungen
+			data[row,]$item.tax         <<- line$Steuersatz
+			data[row,]$customer.id      <<- NA
+			data[row,]$amount           <<- round (line$Betrag, 2)
+			data[row,]$remarks          <<- NA
+			data[row,]$responsible      <<- line$Benutzername
 
-				if (line$Bemerkungen == 'Geld auf Bank') {
-					datev[row,]$'Konto' <<- account.cash
-					datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.bank
-				}
-				else {
-					datev[row,]$'Konto' <<- account.cash
-					datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- 0
-				}
-			}
-			else if (round (sum, 2) == 0) {
-				print (paste ("WARNING: 0€ payment at", line$Rechnungsnummer, sep=" "))
-			}
+			if (line$Bemerkungen == "Geld auf Bank")
+				data[row,]$account <<- account.bank
+			else
+				data[row,]$account <<- 0
 		}
 	}
 }
@@ -412,19 +390,19 @@ for (bill.id in bill.ids) {
 # Import sheets with relevant data and add them to the DATEV frame
 #
 sheet.leistungen <- readWorksheetFromFile (input_file, sheet=1)
-addTurnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
+#addTurnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
 
 sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet=2)
-addTurnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
+#addTurnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
 
 sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet=3)
-addTurnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
+#addTurnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
 
 sheet.produkte <- readWorksheetFromFile (input_file, sheet=4)
-addTurnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
+#addTurnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
 
-#sheet.payments <- readWorksheetFromFile (input_file, sheet=6)
-#addPayment (sheet.payments, title="Ausgabe")
+sheet.cash <- readWorksheetFromFile (input_file, sheet=6)
+addPayment (sheet.cash, title="Ausgabe")
 
 #addDailyCardTransfers ()
 
