@@ -38,6 +38,12 @@ account.bank     <- 1360
 account.card     <- 1361
 account.transfer <- 1362
 
+customer.ids <- c ()
+remarks <- c ()
+responsible <- c ()
+payment.ids <- c ()
+payment.dates <- c()
+
 #
 # Intermediate frame for listing all entries
 #
@@ -55,7 +61,6 @@ data <- data.frame (
 	"responsible"      = character (0), # Name of the responsible person
 	"account"          = numeric (0),   # Account where the money goes to / came from
 	stringsAsFactors=FALSE, check.names=FALSE)
-
 	
 #
 # Datev frame
@@ -217,7 +222,7 @@ addCounterEntry <- function (line, row, account.from, account.to) {
 }
 
 #
-# Fill data frame with the content of one single exported sheet
+# Fill data structure with the content of one single exported sheet
 #
 # @param sheet      Imported worksheet
 # @param title      Sheet title
@@ -225,120 +230,59 @@ addCounterEntry <- function (line, row, account.from, account.to) {
 # @param account.19 Account number used for 19% tax entries
 #
 addTurnover <- function (sheet, title, account.7, account.19) {
+
 	for (i in 1:nrow (sheet)) {
 
 		line <- sheet[i,]
 		bill.id <- line$Rechnungsnummer
 
-		row = nrow (data) + 1
-
-		turnover <- abs (line$Gesamtpreis.brutto)
+		row <- nrow (data) + 1
 
 		#
 		# Skip lines with 0€ turnover. The import does report an error otherwise, because
 		# this cannot be in the world of finance software.
 		#
-		if (round (turnover, 2) != 0) {
+		if ( !is.na (line$Gesamtpreis.brutto) &&
+                 !is.na (line$Rechnungsnummer) &&
+                  round (abs (line$Gesamtpreis.brutto), 2) != 0 ) {
 
-			data$bill.id          <<- bill.is
-			data$payment.id       <<- NA
-			data$payment.date     <<- NA
-			data$item.kind        <<- title
-			data$item.date        <<- line$Rechnungsdatum
-			data$item.description <<- line$Positon
-			data$item.tax         <<- line$Steuersatz
-			data$amount           <<- round (line$Gesamtpreis.brutto, 2)
-			data$account          <<- NA
+			data[row,]$bill.id          <<- bill.id
+			data[row,]$payment.id       <<- NA
+			data[row,]$payment.date     <<- NA
+			data[row,]$item.kind        <<- title
+			data[row,]$item.date        <<- line$Rechnungsdatum
+			data[row,]$item.description <<- line$Position
+			data[row,]$item.tax         <<- line$Steuersatz
+			data[row,]$customer.id      <<- NA
+			data[row,]$amount           <<- round (line$Gesamtpreis.brutto, 2)
+			data[row,]$remarks          <<- NA
+			data[row,]$responsible      <<- NA
+			data[row,]$account          <<- NA
 
 			if (!is.na (customer.ids[bill.id]))
-				data$customer.id <<- customer.ids[bill.id]
+				data[row,]$customer.id <<- customer.ids[bill.id]
 
 			if (!is.na (remarks[bill.id]))
-				data$remars <<- remarks[bill.id]
+				data[row,]$remarks <<- remarks[bill.id]
 
 			if (!is.na (responsible[bill.id]))
-				data$remars <<- responsible[bill.id]
+				data[row,]$responsible <<- responsible[bill.id]
 
+			if (!is.na (payment.ids[bill.id]))
+				data[row,]$payment.id <<- payment.ids[bill.id]
 
+			if (!is.na (payment.dates[bill.id]))
+				data[row,]$payment.date <<- payment.dates[bill.id]
 
-			datev[row,]$'Belegfeld 1'                  <<- line$Rechnungsnummer
-			datev[row,]$'Beleginfo - Art 1'            <<- "Art"
-			datev[row,]$'Beleginfo - Inhalt 1'         <<- title
-
-			datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'  <<- turnover
-			if (line$Gesamtpreis.brutto >= 0) {
-				datev[row,]$'Soll/Haben-Kennzeichen' <<- "H"
-			}
-			else {
-				datev[row,]$'Soll/Haben-Kennzeichen' <<- "S"
-			}
-
-			datev[row,]$'Belegdatum'                   <<- convertDate (line$Rechnungsdatum)
-			datev[row,]$'Buchungstext'                 <<- line$Position
-			datev[row,]$'Beleginfo - Art 2'            <<- "Rechnungsnummer"
-			datev[row,]$'Beleginfo - Inhalt 2'         <<- line$Rechnungsnummer
-			datev[row,]$'Beleginfo - Art 3'            <<- "Rechnungsdatum"
-			datev[row,]$'Beleginfo - Inhalt 3'         <<- format (line$Rechnungsdatum, "%d.%m.%Y")
-			datev[row,]$'Zahlweise'                    <<- line$Zahlungsweise
-			datev[row,]$'EU-Steuersatz'                <<- line$Steuersatz
-			datev[row,]$'USt-Schlüssel (Anzahlungen)'  <<- 0
-
-			if (!is.na (customer.ids[line$Rechnungsnummer])) {
-				datev[row,]$'Beleginfo - Art 4'    <<- "Kundennummer"
-				datev[row,]$'Beleginfo - Inhalt 4' <<- customer.ids[line$Rechnungsnummer]
-			}
-
-			if (!is.na (remarks[line$Rechnungsnummer])) {
-				datev[row,]$'Beleginfo - Art 5'    <<- "Bemerkungen"
-				datev[row,]$'Beleginfo - Inhalt 5' <<- remarks[line$Rechnungsnummer]
-			}
-
-			#
-			# Determine from and to account
-			#
-			account.from <- NA
-			account.to <- NA
-
-			if (line$Steuersatz == 7.0) {
-				datev[row,]$'BU-Schlüssel' <<- 2
-				account.from <- account.7
-			}
-			else if (line$Steuersatz == 19.0) {
-				datev[row,]$'BU-Schlüssel' <<- 3
-				account.from <- account.19
-			}
-
-			#
-			# Payments via EC are logged as 'cash'. The daily EC payments will be
-			# exported to another account separately later on.
-			#
-			if (line$Zahlungsweise == 'EC Karte') {
-				account.to <- account.cash
-			}
-			else if (line$Zahlungsweise == 'Bar') {
-				account.to <- account.cash
-			}
-
-			#
-			# Mixed payments EC/cash are transferred into the income account, too.
-			# The tax people want to sort this out later manually.
-			#
-			else if (line$Zahlungsweise == 'EC Karte, Bar' || line$Zahlungsweise == 'Bar, EC Karte') {
-				account.to <- account.cash
-			}
-			else if (line$Zahlungsweise == 'Überweisung') {
-				account.to <- account.transfer
-			}
-			else {
-				print (paste ("ERROR: Unknown payment kind '", line$Zahlungsweise, "' at ", line$Rechnungsnummer, sep=""))
-			}
-
-			datev[row,]$'Konto'                          <<- account.from
-			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.to
+			if (line$Steuersatz == 7)
+				data[row,]$account <<- account.7
+			else if (line$Steuersatz == 19)
+				data[row,]$account <<- account.19
+			else
+				stop (paste ("Unknown tax level '", line$Steuersatz, "' at ", bill.id, sep=""))
 		}
-		else {
-			print (paste ("WARNING: 0€ turnover at", line$Rechnungsnummer, sep=" "))
-		}
+		else
+			print (paste ("WARNING: 0€ turnover or empty fields at", line$Rechnungsnummer, sep=" "))
 	}
 }
 
@@ -443,12 +387,6 @@ addDailyCardTransfers <- function () {
 #
 sheet.zahlungen <- readWorksheetFromFile (input_file, sheet=5)
 
-customer.ids <- c ()
-remarks <- c ()
-responsible <- c ()
-payment.ids <- c ()
-payment.dates <- c()
-
 payments.all <- sheet.zahlungen[!is.na (sheet.zahlungen$Rechnungsnummer),]
 
 bill.ids = levels (factor (payments.all$Rechnungsnummer))
@@ -474,16 +412,16 @@ for (bill.id in bill.ids) {
 # Import sheets with relevant data and add them to the DATEV frame
 #
 sheet.leistungen <- readWorksheetFromFile (input_file, sheet=1)
-#addTurnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
+addTurnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
 
 sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet=2)
-#addTurnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
+addTurnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
 
 sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet=3)
-#addTurnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
+addTurnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
 
 sheet.produkte <- readWorksheetFromFile (input_file, sheet=4)
-#addTurnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
+addTurnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
 
 #sheet.payments <- readWorksheetFromFile (input_file, sheet=6)
 #addPayment (sheet.payments, title="Ausgabe")
