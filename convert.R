@@ -50,7 +50,7 @@ bill.dates    <- c ()
 #
 data <- data.frame (
 	"bill.id"          = character (0), # Id of the bill
-	"bill.date",       = character (0), # Date of the bill
+	"bill.date"        = character (0), # Date of the bill
 	"payment.id"       = numeric (0),   # Id of the payment itself
 	"payment.date"     = character (0), # Date of payment
 	"payment.kind"     = character (0), # Way of payment (cash, card, ...)
@@ -212,8 +212,6 @@ reduce_vector <- function (v) {
 	v <- unique (v)
 	return (paste (v, collapse=", "))
 }
-
-
 
 #
 # Fill data structure with the content of one single exported sheet
@@ -421,82 +419,69 @@ sheet.leistungen <- readWorksheetFromFile (input_file, sheet="Leistungen")
 add_turnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
 
 sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet="Medikamente angewendet")
-add_turnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
+#add_turnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
 
 sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet="Medikamente abgegeben")
-add_turnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
+#add_turnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
 
 sheet.produkte <- readWorksheetFromFile (input_file, sheet="Produkte")
-add_turnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
+#add_turnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
 
 sheet.cash <- readWorksheetFromFile (input_file, sheet="Zahlungen MwSt")
-add_payment (sheet.cash, title="Ausgabe")
+#add_payment (sheet.cash, title="Ausgabe")
 
-add_card_transfers (sheet.zahlungen, "Umbuchung EC-Karten-Zahlung")
+#add_card_transfers (sheet.zahlungen, "Umbuchung EC-Karten-Zahlung")
 
-export_datev <- function () {
-	#
-	# Generate DATEV table from internal representation
-	#
-	data2 <- data.frame (
-		"bill.id"          = character (0), # Id of the bill
-		"bill.date",       = character (0), # Date of the bill
-		"payment.id"       = numeric (0),   # Id of the payment itself
-		"payment.date"     = character (0), # Date of payment
-		"item.kind"        = character (0), # Kind of item applied/sold
-		"item.date"        = character (0), # Date the item was applied/sold
-		"item.description" = character (0), # Description of the item
-		"item.tax"         = numeric (0),   # Tax of the item
-		"customer.id"      = character (0), # Id of the customer
-		"amount"           = double (0),    # Amount of money
-		"remarks"          = character (0), # Payment remarks
-		"responsible"      = character (0), # Name of the responsible person
-		"account"          = numeric (0),   # Account where the money goes to / came from
-		stringsAsFactors=FALSE, check.names=FALSE)
+#
+# Sort whole table
+#
+#data <- data[order (data$bill.id),]
+
+generate_datev <- function () {
 
 	for (i in 1:nrow (data)) {
 		line <- data[i,]
 		row <- nrow (datev) + 1
 
-		datev[row,]$Umsatz <<- abs (line$amount)
+		datev[row,]$'Umsatz (ohne Soll/Haben-Kz)' <<- abs (line$amount)
 
 		if (line$amount < 0)
-			datev[row,]$Soll.Haben <<- "S"
+			datev[row,]$'Soll/Haben-Kennzeichen' <<- "S"
 		else
-			datev[row,]$Soll.Haben <<- "H"
+			datev[row,]$'Soll/Haben-Kennzeichen' <<- "H"
 
 		if (line$item.tax == 19)
-			datev[row,]$BU.Schlüssel <<- 3
+			datev[row,]$'BU-Schlüssel' <<- 3
 		else if (line$item.tax == 7)
-			datev[row,]$BU.Schlüssel <<- 2
+			datev[row,]$'BU-Schlüssel' <<- 2
 
-		datev[row,]$Konto              <<- line$account
-		datev[row,]$Gegenkonto         <<- account.main
-		datev[row,]$Belegdatum         <<- line$payment.date
-		datev[row,]$Buchungstext       <<- line$item.description
-		datev[row,]$EU.Steuersatz      <<- item.tax
-		datev[row,]$Buchungstyp        <<- line$payment.kind
-		datev[row,]$Leistungsdatum     <<- line$item.date
-		datev[row,]$Gesellschaftername <<- line$responsible
+		datev[row,]$'Konto'              <<- line$account
+		datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.main
+		#datev[row,]$'Belegdatum'         <<- line$payment.date
+		datev[row,]$'Buchungstext'       <<- line$item.description
+		datev[row,]$'EU-Steuersatz'      <<- line$item.tax
+		datev[row,]$'Buchungstyp'        <<- line$payment.kind
+		#datev[row,]$'Leistungsdatum'    <<- line$item.date
+		datev[row,]$'Gesellschaftername' <<- line$responsible
 
-		datev[row,]$Beleginfo.Art.1    <<- "Rechnungsnummer"
-		datev[row,]$Beleginfo.Inhalt.1 <<- line$bill.id
-		datev[row,]$Beleginfo.Art.2    <<- "Rechnungsdatum"
-		datev[row,]$Beleginfo.Inhalt.2 <<- line$bill.date
-		datev[row,]$Beleginfo.Art.3    <<- "Vorgangsnummer"
-		datev[row,]$Beleginfo.Inhalt.3 <<- line$payment.id
-		datev[row,]$Beleginfo.Art.4    <<- "Vorgangstyp"
-		datev[row,]$Beleginfo.Inhalt.4 <<- line$item.kind
-		datev[row,]$Beleginfo.Art.5    <<- "Kundennummer"
-		datev[row,]$Beleginfo.Inhalt.5 <<- line$customer.id
-		datev[row,]$Beleginfo.Art.6    <<- "Bemerkungen"
-		datev[row,]$Beleginfo.Inhalt.6 <<- line$remarks
+		datev[row,]$'Beleginfo - Art 1'    <<- "Rechnungsnummer"
+		datev[row,]$'Beleginfo - Inhalt 1' <<- line$bill.id
+		datev[row,]$'Beleginfo - Art 2'    <<- "Rechnungsdatum"
+		datev[row,]$'Beleginfo - Inhalt 2' <<- line$bill.date
+		datev[row,]$'Beleginfo - Art 3'    <<- "Vorgangsnummer"
+		datev[row,]$'Beleginfo - Inhalt 3' <<- line$payment.id
+		datev[row,]$'Beleginfo - Art 4'    <<- "Typ"
+		datev[row,]$'Beleginfo - Inhalt 4' <<- line$item.kind
+		datev[row,]$'Beleginfo - Art 5'    <<- "Kundennummer"
+		datev[row,]$'Beleginfo - Inhalt 5' <<- line$customer.id
+		datev[row,]$'Beleginfo - Art 6'    <<- "Bemerkungen"
+		datev[row,]$'Beleginfo - Inhalt 6' <<- line$remarks
 		
 	}
 }
 
 
-export_datev ()
+generate_datev ()
 
 #
 # Write everything into the output file
@@ -509,10 +494,6 @@ export_datev ()
 
 #handle <- file (output_file, encoding="latin1")
 #write.table (output, file=handle, row.names=FALSE, quote=FALSE, na="", sep=";", dec=",", qmethod=c("escape", "double"))
-
-
-
-#data <- data[order (data$bill.id),]
 
 
 #
