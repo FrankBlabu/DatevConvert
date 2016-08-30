@@ -27,11 +27,11 @@ library ("XLConnect")
 # Configuration
 #
 
-#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
-input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-06.xlsx"
+input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
+#input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-06.xlsx"
 
-#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
-output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
+output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
+#output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
 
 account.cash     <- 1001
 account.bank     <- 1360
@@ -201,25 +201,6 @@ trim <- function (text) {
 	sub ("^\\s+", "", text)
 }
 
-#
-# Add counter entry
-#
-# @param line         Input line
-# @param row          DATEV frame row number to add
-# @param account.from Where the money comes from
-# @param account.to   Where the mones goes to
-#
-addCounterEntry <- function (line, row, account.from, account.to) {
-	if (datev[row,]$'Soll/Haben-Kennzeichen' == 'H') {
-		datev[row,]$'Soll/Haben-Kennzeichen' <<- 'S'
-	}
-	else {
-		datev[row,]$'Soll/Haben-Kennzeichen' <<- 'H'
-	}
-
-	datev[row,]$'Konto'                          <<- account.from
-	datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.to
-}
 
 #
 # Fill data structure with the content of one single exported sheet
@@ -297,9 +278,9 @@ addPayment <- function (sheet, title) {
 	s <- sheet[is.na (sheet$Rechnungsnummer),]
 
 	for (i in 1:nrow (s)) {
-		line = s[i,]
+		line <- s[i,]
 
-		row = nrow (data) + 1
+		row <- nrow (data) + 1
 
 		#
 		# Skip lines with 0€ turnover. The import does report an error otherwise, because
@@ -329,33 +310,33 @@ addPayment <- function (sheet, title) {
 }
 
 #
-# Withdraw the amount of money gathered via EC card in daily doses
+# Withdraw the amount of money gathered via EC card per transaction
 #
-addDailyCardTransfers <- function () {
+addCardTransfers <- function (sheet, title) {
+	
+	s <- sheet[!is.na (sheet$Nummer),]
 
-	ec <- datev[datev$Zahlweise == 'EC Karte',]
+	for (i in 1:nrow (sheet)) {
+		line <- sheet[i,]
 
-	for (i in 1:nrow (ec)) {
-		if (!is.na (ec$Soll[i]) && ec$Soll[i] == "S")
-			ec$Umsatz[i] <- ec$Umsatz[i] * -1.0
-	}
+		if ( !is.na (line$Nummer) && 
+                 !endsWith (line$Nummer, "X") &&
+                 nrow (s[s$Nummer == paste (line$Nummer, "X", sep=""),]) == 0 &&
+                 line$Zahlungsweise == "EC Karte" ) {
 
-	sums <- tapply (ec$Umsatz, factor (ec$Belegdatum), sum)
+			row <- nrow (data) + 1
 
-	for (i in 1:length (sums)) {
-		date <- names (sums)[i]
-		sum <- sums[i]
-
-		if (!is.na (sum) && round (sum, 2) > 0) {
-
-			row = nrow(datev) + 1	
-
-			datev[row,]$'Belegdatum'                     <<- date
-			datev[row,]$'Umsatz (ohne Soll/Haben-Kz)'    <<- sum
-			datev[row,]$'Soll/Haben-Kennzeichen'         <<- "H"
-			datev[row,]$'Buchungstext'                   <<- "EC-Übertrag"
-			datev[row,]$'Konto'                          <<- account.cash
-			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.bank
+			data[row,]$bill.id          <<- line$Rechnungsnummer
+			data[row,]$payment.id       <<- line$Nummer
+			data[row,]$payment.date     <<- line$Datum
+			data[row,]$item.kind        <<- title
+			data[row,]$item.date        <<- line$Datum
+			data[row,]$item.description <<- line$Bemerkungen
+			data[row,]$item.tax         <<- 0
+			data[row,]$customer.id      <<- line$Kundennummer
+			data[row,]$amount           <<- round (line$Betrag, 2)
+			data[row,]$remarks          <<- NA
+			data[row,]$responsible      <<- line$Benutzername
 		}
 	}
 }
@@ -363,7 +344,17 @@ addDailyCardTransfers <- function () {
 #
 # Import sheet 'Zahlungen' and extract a customer id per bill number
 #
-sheet.zahlungen <- readWorksheetFromFile (input_file, sheet=5)
+sheet.zahlungen <- readWorksheetFromFile (input_file, sheet="Zahlungen", forceConversion=TRUE,
+	colTypes = c (XLC$DATA_TYPE.STRING,   # Rechnungsnummer
+                    XLC$DATA_TYPE.STRING,   # Nummer
+                    XLC$DATA_TYPE.DATETIME, # Datum
+                    XLC$DATA_TYPE.NUMERIC,  # Betrag
+                    XLC$DATA_TYPE.STRING,   # Zahlungsweise
+                    XLC$DATA_TYPE.STRING,   # Bemerkungen
+                    XLC$DATA_TYPE.STRING,   # Kundennummer
+                    XLC$DATA_TYPE.STRING    # Benutzername
+))
+                    
 
 payments.all <- sheet.zahlungen[!is.na (sheet.zahlungen$Rechnungsnummer),]
 
@@ -389,22 +380,22 @@ for (bill.id in bill.ids) {
 #
 # Import sheets with relevant data and add them to the DATEV frame
 #
-sheet.leistungen <- readWorksheetFromFile (input_file, sheet=1)
-#addTurnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
+sheet.leistungen <- readWorksheetFromFile (input_file, sheet="Leistungen")
+addTurnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
 
-sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet=2)
+sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet="Medikamente angewendet")
 #addTurnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
 
-sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet=3)
+sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet="Medikamente abgegeben")
 #addTurnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
 
-sheet.produkte <- readWorksheetFromFile (input_file, sheet=4)
+sheet.produkte <- readWorksheetFromFile (input_file, sheet="Produkte")
 #addTurnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
 
-sheet.cash <- readWorksheetFromFile (input_file, sheet=6)
-addPayment (sheet.cash, title="Ausgabe")
+sheet.cash <- readWorksheetFromFile (input_file, sheet="Zahlungen MwSt")
+#addPayment (sheet.cash, title="Ausgabe")
 
-#addDailyCardTransfers ()
+addCardTransfers (sheet.zahlungen, "Umbuchung EC-Karten-Zahlung")
 
 #
 # Write everything into the output file
