@@ -78,7 +78,7 @@ datev <- data.frame (
     "Konto" = character (0),                          # 6
     "Gegenkonto (ohne BU-Schlüssel)" = character (0), # 7
     "BU-Schlüssel" = character (0),                   # 8
-    "Belegdatum" = character (0),                     # 9
+    "Belegdatum" = as.Date (character (0)),           # 9
     "Belegfeld 1" = character (0),                    # 10
     "Belegfeld 2" = character (0),                    # 11
     "Skonto" = double (0),                            # 12
@@ -172,7 +172,7 @@ datev <- data.frame (
     "Erlöskonto (Anzahlungen)" = double (0),          # 100
     "Herkunft-Kz" = double (0),                       # 101
     "Buchungs GUID" = double (0),                     # 102
-    "KOST-Datum" = as.POSIXct (character (0)),        # 103
+    "KOST-Datum" = as.Date (character ()),            # 103
     "SEPA-Mandatsreferenz" = double (0),              # 104
     "Skontosperre" = double (0),                      # 105
     "Gesellschaftername" = double (0),                # 106
@@ -183,8 +183,8 @@ datev <- data.frame (
     "Bezeichnung SoBil-Sachverhalt" = double (0),     # 111
     "Kennzeichen SoBil-Buchung" = double (0),         # 112
     "Festschreibung" = double (0),                    # 113
-    "Leistungsdatum" = as.POSIXct (character (0)),    # 114
-    "Datum Zuord. Steuerperiode" = as.POSIXct (character (0)), # 115
+    "Leistungsdatum" = as.Date (character ()),        # 114
+    "Datum Zuord. Steuerperiode" = character (),      # 115
     stringsAsFactors=FALSE, check.names=FALSE)
 
 
@@ -192,9 +192,14 @@ datev <- data.frame (
 #
 # Convert POSIXct date into DATEV string like '0416' for 04-2016
 #
-convert_date <- function (date) {
+convert_datev_date <- function (date) {
 	d = as.POSIXlt (date)
 	return (sprintf ("%02d%02d", d$mday, d$mon + 1))
+}
+
+convert_date <- function (date) {
+	d <- as.POSIXlt (date)
+	return (sprintf ("%04d-%02d-%02d", 1900 + d$year, d$mon + 1, d$mday))
 }
 
 #
@@ -244,7 +249,7 @@ add_turnover <- function (sheet, title, account.7, account.19) {
 			data[row,]$payment.date     <<- NA
 			data[row,]$payment.kind     <<- line$Zahlungsweise
 			data[row,]$item.kind        <<- title
-			data[row,]$item.date        <<- line$Rechnungsdatum
+			data[row,]$item.date        <<- convert_date (line$Rechnungsdatum)
 			data[row,]$item.description <<- line$Position
 			data[row,]$item.tax         <<- line$Steuersatz
 			data[row,]$customer.id      <<- NA
@@ -347,10 +352,10 @@ add_card_transfers <- function (sheet, title) {
 			data[row,]$bill.id          <<- line$Rechnungsnummer
 			data[row,]$bill.date        <<- NA
 			data[row,]$payment.id       <<- line$Nummer
-			data[row,]$payment.date     <<- line$Datum
+			data[row,]$payment.date     <<- convert_date (line$Datum)
 			data[row,]$payment.kind     <<- "Überweisung"
 			data[row,]$item.kind        <<- title
-			data[row,]$item.date        <<- line$Datum
+			data[row,]$item.date        <<- convert_date (line$Datum)
 			data[row,]$item.description <<- line$Bemerkungen
 			data[row,]$item.tax         <<- 0
 			data[row,]$customer.id      <<- line$Kundennummer
@@ -391,7 +396,7 @@ for (bill.id in payment.bill.ids) {
 	responsible[bill.id]   <- reduce_vector (payment$Benutzername)
 	payment.ids[bill.id]   <- reduce_vector (payment$Nummer)
 
-	dates <- payment$Datum
+	dates <- convert_date (payment$Datum)
 	dates <- dates[!is.na (dates)]
 	dates <- unique (dates)
 	
@@ -408,7 +413,7 @@ invoice.bill.ids <- levels (factor (invoices.all$Rechnungsnummer))
 
 for (bill.id in invoice.bill.ids) {
 	invoice <- invoices.all[invoices.all$Rechnungsnummer == bill.id,]
-	bill.dates[bill.id] <- reduce_vector (invoice$Rechnungsdatum)
+	bill.dates[bill.id] <- reduce_vector (convert_date (invoice$Rechnungsdatum))
 }
 
 
@@ -419,18 +424,18 @@ sheet.leistungen <- readWorksheetFromFile (input_file, sheet="Leistungen")
 add_turnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
 
 sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet="Medikamente angewendet")
-#add_turnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
+add_turnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
 
 sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet="Medikamente abgegeben")
-#add_turnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
+add_turnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
 
 sheet.produkte <- readWorksheetFromFile (input_file, sheet="Produkte")
-#add_turnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
+add_turnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
 
 sheet.cash <- readWorksheetFromFile (input_file, sheet="Zahlungen MwSt")
-#add_payment (sheet.cash, title="Ausgabe")
+add_payment (sheet.cash, title="Ausgabe")
 
-#add_card_transfers (sheet.zahlungen, "Umbuchung EC-Karten-Zahlung")
+add_card_transfers (sheet.zahlungen, "Umbuchung EC-Karten-Zahlung")
 
 #
 # Sort whole table
@@ -455,14 +460,14 @@ generate_datev <- function () {
 		else if (line$item.tax == 7)
 			datev[row,]$'BU-Schlüssel' <<- 2
 
-		datev[row,]$'Konto'              <<- line$account
+		datev[row,]$'Konto'                          <<- line$account
 		datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.main
-		#datev[row,]$'Belegdatum'         <<- line$payment.date
-		datev[row,]$'Buchungstext'       <<- line$item.description
-		datev[row,]$'EU-Steuersatz'      <<- line$item.tax
-		datev[row,]$'Buchungstyp'        <<- line$payment.kind
-		#datev[row,]$'Leistungsdatum'    <<- line$item.date
-		datev[row,]$'Gesellschaftername' <<- line$responsible
+		datev[row,]$'Belegdatum'                     <<- line$payment.date
+		datev[row,]$'Buchungstext'                   <<- line$item.description
+		datev[row,]$'EU-Steuersatz'                  <<- line$item.tax
+		datev[row,]$'Buchungstyp'                    <<- line$payment.kind
+		datev[row,]$'Leistungsdatum'                 <<- line$item.date
+		datev[row,]$'Gesellschaftername'             <<- line$responsible
 
 		datev[row,]$'Beleginfo - Art 1'    <<- "Rechnungsnummer"
 		datev[row,]$'Beleginfo - Inhalt 1' <<- line$bill.id
@@ -488,12 +493,12 @@ generate_datev ()
 #
 # The turnover is formatted into a rounded string before.
 #
-#output <- datev
+output <- datev
 
 #output$'Umsatz (ohne Soll/Haben-Kz)' <- trim (format (round (output$'Umsatz (ohne Soll/Haben-Kz)', 2), nsmall=2, decimal.mark=","))
 
-#handle <- file (output_file, encoding="latin1")
-#write.table (output, file=handle, row.names=FALSE, quote=FALSE, na="", sep=";", dec=",", qmethod=c("escape", "double"))
+handle <- file (output_file, encoding="latin1")
+write.table (output, file=handle, row.names=FALSE, quote=FALSE, na="", sep=";", dec=",", qmethod=c("escape", "double"))
 
 
 #
