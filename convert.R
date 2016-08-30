@@ -33,24 +33,27 @@ input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-expor
 output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
 #output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
 
-account.cash     <- 1001
+account.main     <- 1001
 account.bank     <- 1360
 account.card     <- 1361
 account.transfer <- 1362
 
-customer.ids <- c ()
-remarks <- c ()
-responsible <- c ()
-payment.ids <- c ()
-payment.dates <- c()
+customer.ids  <- c ()
+remarks       <- c ()
+responsible   <- c ()
+payment.ids   <- c ()
+payment.dates <- c ()
+bill.dates    <- c ()
 
 #
 # Intermediate frame for listing all entries
 #
 data <- data.frame (
 	"bill.id"          = character (0), # Id of the bill
+	"bill.date",       = character (0), # Date of the bill
 	"payment.id"       = numeric (0),   # Id of the payment itself
 	"payment.date"     = character (0), # Date of payment
+	"payment.kind"     = character (0), # Way of payment (cash, card, ...)
 	"item.kind"        = character (0), # Kind of item applied/sold
 	"item.date"        = character (0), # Date the item was applied/sold
 	"item.description" = character (0), # Description of the item
@@ -189,7 +192,7 @@ datev <- data.frame (
 #
 # Convert POSIXct date into DATEV string like '0416' for 04-2016
 #
-convertDate <- function (date) {
+convert_date <- function (date) {
 	d = as.POSIXlt (date)
 	return (sprintf ("%02d%02d", d$mday, d$mon + 1))
 }
@@ -201,6 +204,16 @@ trim <- function (text) {
 	sub ("^\\s+", "", text)
 }
 
+#
+# Reduce vector into comma separated representation
+#
+reduce_vector <- function (v) {
+	v <- v[!is.na (v)]
+	v <- unique (v)
+	return (paste (v, collapse=", "))
+}
+
+
 
 #
 # Fill data structure with the content of one single exported sheet
@@ -210,7 +223,7 @@ trim <- function (text) {
 # @param account.7  Account number used for 7% tax entries
 # @param account.19 Account number used for 19% tax entries
 #
-addTurnover <- function (sheet, title, account.7, account.19) {
+add_turnover <- function (sheet, title, account.7, account.19) {
 
 	for (i in 1:nrow (sheet)) {
 
@@ -228,8 +241,10 @@ addTurnover <- function (sheet, title, account.7, account.19) {
                   round (abs (line$Gesamtpreis.brutto), 2) != 0 ) {
 
 			data[row,]$bill.id          <<- bill.id
+			data[row,]$bill.date        <<- NA
 			data[row,]$payment.id       <<- NA
 			data[row,]$payment.date     <<- NA
+			data[row,]$payment.kind     <<- line$Zahlungsweise
 			data[row,]$item.kind        <<- title
 			data[row,]$item.date        <<- line$Rechnungsdatum
 			data[row,]$item.description <<- line$Position
@@ -255,6 +270,9 @@ addTurnover <- function (sheet, title, account.7, account.19) {
 			if (!is.na (payment.dates[bill.id]))
 				data[row,]$payment.date <<- payment.dates[bill.id]
 
+			if (!is.na (bill.dates[bill.id]))
+				data[row,]$bill.date <<- bill.dates[bill.id]
+
 			if (line$Steuersatz == 7)
 				data[row,]$account <<- account.7
 			else if (line$Steuersatz == 19)
@@ -273,7 +291,7 @@ addTurnover <- function (sheet, title, account.7, account.19) {
 # @param sheet Imported worksheet
 # @param title Sheet title
 #
-addPayment <- function (sheet, title) {
+add_payment <- function (sheet, title) {
 
 	s <- sheet[is.na (sheet$Rechnungsnummer),]
 
@@ -290,8 +308,10 @@ addPayment <- function (sheet, title) {
                   round (abs (line$Betrag), 2) != 0 ) {
 
 			data[row,]$bill.id          <<- NA
+			data[row,]$bill.date        <<- NA
 			data[row,]$payment.id       <<- line$Nummer
 			data[row,]$payment.date     <<- line$Datum
+			data[row,]$payment.kind     <<- "Bar"
 			data[row,]$item.kind        <<- title
 			data[row,]$item.date        <<- line$Datum
 			data[row,]$item.description <<- line$Bemerkungen
@@ -312,7 +332,7 @@ addPayment <- function (sheet, title) {
 #
 # Withdraw the amount of money gathered via EC card per transaction
 #
-addCardTransfers <- function (sheet, title) {
+add_card_transfers <- function (sheet, title) {
 	
 	s <- sheet[!is.na (sheet$Nummer),]
 
@@ -327,8 +347,10 @@ addCardTransfers <- function (sheet, title) {
 			row <- nrow (data) + 1
 
 			data[row,]$bill.id          <<- line$Rechnungsnummer
+			data[row,]$bill.date        <<- NA
 			data[row,]$payment.id       <<- line$Nummer
 			data[row,]$payment.date     <<- line$Datum
+			data[row,]$payment.kind     <<- "Überweisung"
 			data[row,]$item.kind        <<- title
 			data[row,]$item.date        <<- line$Datum
 			data[row,]$item.description <<- line$Bemerkungen
@@ -337,12 +359,16 @@ addCardTransfers <- function (sheet, title) {
 			data[row,]$amount           <<- round (line$Betrag, 2)
 			data[row,]$remarks          <<- NA
 			data[row,]$responsible      <<- line$Benutzername
+
+			if (!is.na (bill.dates[bill.id]))
+				data[row,]$bill.date <<- bill.dates[bill.id]
+
 		}
 	}
 }
 
 #
-# Import sheet 'Zahlungen' and extract a customer id per bill number
+# Import sheet 'Zahlungen' and extract customer data per bill number
 #
 sheet.zahlungen <- readWorksheetFromFile (input_file, sheet="Zahlungen", forceConversion=TRUE,
 	colTypes = c (XLC$DATA_TYPE.STRING,   # Rechnungsnummer
@@ -354,19 +380,11 @@ sheet.zahlungen <- readWorksheetFromFile (input_file, sheet="Zahlungen", forceCo
                     XLC$DATA_TYPE.STRING,   # Kundennummer
                     XLC$DATA_TYPE.STRING    # Benutzername
 ))
-                    
 
 payments.all <- sheet.zahlungen[!is.na (sheet.zahlungen$Rechnungsnummer),]
+payment.bill.ids <- levels (factor (payments.all$Rechnungsnummer))
 
-bill.ids = levels (factor (payments.all$Rechnungsnummer))
-
-reduce_vector <- function (v) {
-	v <- v[!is.na (v)]
-	v <- unique (v)
-	return (paste (v, collapse=", "))
-}
-
-for (bill.id in bill.ids) {
+for (bill.id in payment.bill.ids) {
 
 	payment <- payments.all[payments.all$Rechnungsnummer == bill.id,]
 
@@ -374,28 +392,111 @@ for (bill.id in bill.ids) {
 	remarks[bill.id]       <- reduce_vector (payment$Bemerkungen)
 	responsible[bill.id]   <- reduce_vector (payment$Benutzername)
 	payment.ids[bill.id]   <- reduce_vector (payment$Nummer)
-	payment.dates[bill.id] <- reduce_vector (payment$Datum)
+
+	dates <- payment$Datum
+	dates <- dates[!is.na (dates)]
+	dates <- unique (dates)
+	
+	if (length (dates) > 0)
+		payment.dates[bill.id] <- dates[1]
 }
 
 #
-# Import sheets with relevant data and add them to the DATEV frame
+# Import sheet 'Rechnungen' for the correct bill date
+# 
+sheet.rechnungen <- readWorksheetFromFile (input_file, sheet="Rechnungen", forceConversion=TRUE)                    
+invoices.all <- sheet.rechnungen[!is.na (sheet.rechnungen$Rechnungsnummer),]
+invoice.bill.ids <- levels (factor (invoices.all$Rechnungsnummer))
+
+for (bill.id in invoice.bill.ids) {
+	invoice <- invoices.all[invoices.all$Rechnungsnummer == bill.id,]
+	bill.dates[bill.id] <- reduce_vector (invoice$Rechnungsdatum)
+}
+
+
+#
+# Import sheets with relevant data and add them to the internal data representation
 #
 sheet.leistungen <- readWorksheetFromFile (input_file, sheet="Leistungen")
-addTurnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
+add_turnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
 
 sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet="Medikamente angewendet")
-#addTurnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
+add_turnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
 
 sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet="Medikamente abgegeben")
-#addTurnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
+add_turnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
 
 sheet.produkte <- readWorksheetFromFile (input_file, sheet="Produkte")
-#addTurnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
+add_turnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
 
 sheet.cash <- readWorksheetFromFile (input_file, sheet="Zahlungen MwSt")
-#addPayment (sheet.cash, title="Ausgabe")
+add_payment (sheet.cash, title="Ausgabe")
 
-addCardTransfers (sheet.zahlungen, "Umbuchung EC-Karten-Zahlung")
+add_card_transfers (sheet.zahlungen, "Umbuchung EC-Karten-Zahlung")
+
+export_datev <- function () {
+	#
+	# Generate DATEV table from internal representation
+	#
+	data2 <- data.frame (
+		"bill.id"          = character (0), # Id of the bill
+		"bill.date",       = character (0), # Date of the bill
+		"payment.id"       = numeric (0),   # Id of the payment itself
+		"payment.date"     = character (0), # Date of payment
+		"item.kind"        = character (0), # Kind of item applied/sold
+		"item.date"        = character (0), # Date the item was applied/sold
+		"item.description" = character (0), # Description of the item
+		"item.tax"         = numeric (0),   # Tax of the item
+		"customer.id"      = character (0), # Id of the customer
+		"amount"           = double (0),    # Amount of money
+		"remarks"          = character (0), # Payment remarks
+		"responsible"      = character (0), # Name of the responsible person
+		"account"          = numeric (0),   # Account where the money goes to / came from
+		stringsAsFactors=FALSE, check.names=FALSE)
+
+	for (i in 1:nrow (data)) {
+		line <- data[i,]
+		row <- nrow (datev) + 1
+
+		datev[row,]$Umsatz <<- abs (line$amount)
+
+		if (line$amount < 0)
+			datev[row,]$Soll.Haben <<- "S"
+		else
+			datev[row,]$Soll.Haben <<- "H"
+
+		if (line$item.tax == 19)
+			datev[row,]$BU.Schlüssel <<- 3
+		else if (line$item.tax == 7)
+			datev[row,]$BU.Schlüssel <<- 2
+
+		datev[row,]$Konto              <<- line$account
+		datev[row,]$Gegenkonto         <<- account.main
+		datev[row,]$Belegdatum         <<- line$payment.date
+		datev[row,]$Buchungstext       <<- line$item.description
+		datev[row,]$EU.Steuersatz      <<- item.tax
+		datev[row,]$Buchungstyp        <<- line$payment.kind
+		datev[row,]$Leistungsdatum     <<- line$item.date
+		datev[row,]$Gesellschaftername <<- line$responsible
+
+		datev[row,]$Beleginfo.Art.1    <<- "Rechnungsnummer"
+		datev[row,]$Beleginfo.Inhalt.1 <<- line$bill.id
+		datev[row,]$Beleginfo.Art.2    <<- "Rechnungsdatum"
+		datev[row,]$Beleginfo.Inhalt.2 <<- line$bill.date
+		datev[row,]$Beleginfo.Art.3    <<- "Vorgangsnummer"
+		datev[row,]$Beleginfo.Inhalt.3 <<- line$payment.id
+		datev[row,]$Beleginfo.Art.4    <<- "Vorgangstyp"
+		datev[row,]$Beleginfo.Inhalt.4 <<- line$item.kind
+		datev[row,]$Beleginfo.Art.5    <<- "Kundennummer"
+		datev[row,]$Beleginfo.Inhalt.5 <<- line$customer.id
+		datev[row,]$Beleginfo.Art.6    <<- "Bemerkungen"
+		datev[row,]$Beleginfo.Inhalt.6 <<- line$remarks
+		
+	}
+}
+
+
+export_datev ()
 
 #
 # Write everything into the output file
@@ -415,7 +516,7 @@ addCardTransfers (sheet.zahlungen, "Umbuchung EC-Karten-Zahlung")
 
 
 #
-# Checks: 
+# Todo: 
 #
-# * Zero sum not allowed
+# * Invoice date from table "Rechnungen"
 #
