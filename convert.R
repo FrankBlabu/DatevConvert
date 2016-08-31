@@ -28,10 +28,10 @@ library ("XLConnect")
 #
 
 #input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
-input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-06.xlsx"
+input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-07.xlsx"
 
 #output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
-output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
+output_file <- "e:/test/convert/datevconvert/datev-2016-07.csv"
 
 account.main     <- 1001
 account.bank     <- 1360
@@ -327,7 +327,7 @@ add_payment <- function (sheet, title) {
 			data[row,]$remarks          <<- NA
 			data[row,]$responsible      <<- line$Benutzername
 
-			if (line$Bemerkungen == "Geld auf Bank") {
+			if (startsWith (line$Bemerkungen, "Geld auf Bank")) {
 				data[row,]$account      <<- account.bank
 				data[row,]$payment.type <<- "Einzahlung"
 			}
