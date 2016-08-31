@@ -27,11 +27,11 @@ library ("XLConnect")
 # Configuration
 #
 
-input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
-#input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-06.xlsx"
+#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
+input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-06.xlsx"
 
-output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
-#output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
+#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
+output_file <- "e:/test/convert/datevconvert/datev-2016-06.csv"
 
 account.main     <- 1001
 account.bank     <- 1360
@@ -78,7 +78,7 @@ datev <- data.frame (
     "Konto" = character (0),                          # 6
     "Gegenkonto (ohne BU-Schlüssel)" = character (0), # 7
     "BU-Schlüssel" = character (0),                   # 8
-    "Belegdatum" = as.Date (character (0)),           # 9
+    "Belegdatum" = character (0),                     # 9
     "Belegfeld 1" = character (0),                    # 10
     "Belegfeld 2" = character (0),                    # 11
     "Skonto" = double (0),                            # 12
@@ -183,7 +183,7 @@ datev <- data.frame (
     "Bezeichnung SoBil-Sachverhalt" = double (0),     # 111
     "Kennzeichen SoBil-Buchung" = double (0),         # 112
     "Festschreibung" = double (0),                    # 113
-    "Leistungsdatum" = as.Date (character ()),        # 114
+    "Leistungsdatum" = character (),                  # 114
     "Datum Zuord. Steuerperiode" = character (),      # 115
     stringsAsFactors=FALSE, check.names=FALSE)
 
@@ -424,18 +424,18 @@ sheet.leistungen <- readWorksheetFromFile (input_file, sheet="Leistungen")
 add_turnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
 
 sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet="Medikamente angewendet")
-add_turnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
+#add_turnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
 
 sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet="Medikamente abgegeben")
-add_turnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
+#add_turnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
 
 sheet.produkte <- readWorksheetFromFile (input_file, sheet="Produkte")
-add_turnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
+#add_turnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
 
 sheet.cash <- readWorksheetFromFile (input_file, sheet="Zahlungen MwSt")
-add_payment (sheet.cash, title="Ausgabe")
+#add_payment (sheet.cash, title="Ausgabe")
 
-add_card_transfers (sheet.zahlungen, "Umbuchung EC-Karten-Zahlung")
+#add_card_transfers (sheet.zahlungen, "Umbuchung EC-Karten-Zahlung")
 
 #
 # Sort whole table
@@ -462,11 +462,11 @@ generate_datev <- function () {
 
 		datev[row,]$'Konto'                          <<- line$account
 		datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.main
-		datev[row,]$'Belegdatum'                     <<- line$payment.date
+		datev[row,]$'Belegdatum'                     <<- format (as.Date (line$payment.date), "%d%m%Y")
 		datev[row,]$'Buchungstext'                   <<- line$item.description
 		datev[row,]$'EU-Steuersatz'                  <<- line$item.tax
 		datev[row,]$'Buchungstyp'                    <<- line$payment.kind
-		datev[row,]$'Leistungsdatum'                 <<- line$item.date
+		datev[row,]$'Leistungsdatum'                 <<- format (as.Date (line$item.date), "%d%m%Y")
 		datev[row,]$'Gesellschaftername'             <<- line$responsible
 
 		datev[row,]$'Beleginfo - Art 1'    <<- "Rechnungsnummer"
@@ -490,8 +490,6 @@ generate_datev ()
 
 #
 # Write everything into the output file
-#
-# The turnover is formatted into a rounded string before.
 #
 output <- datev
 
