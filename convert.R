@@ -54,6 +54,7 @@ data <- data.frame (
 	"payment.id"       = numeric (0),   # Id of the payment itself
 	"payment.date"     = character (0), # Date of payment
 	"payment.kind"     = character (0), # Way of payment (cash, card, ...)
+	"payment.type"     = character (0), # Type of payment (transfer, ...)
 	"item.kind"        = character (0), # Kind of item applied/sold
 	"item.date"        = character (0), # Date the item was applied/sold
 	"item.description" = character (0), # Description of the item
@@ -248,6 +249,7 @@ add_turnover <- function (sheet, title, account.7, account.19) {
 			data[row,]$payment.id       <<- NA
 			data[row,]$payment.date     <<- NA
 			data[row,]$payment.kind     <<- line$Zahlungsweise
+			data[row,]$payment.type     <<- "Umsatz"
 			data[row,]$item.kind        <<- title
 			data[row,]$item.date        <<- convert_date (line$Rechnungsdatum)
 			data[row,]$item.description <<- line$Position
@@ -315,6 +317,7 @@ add_payment <- function (sheet, title) {
 			data[row,]$payment.id       <<- line$Nummer
 			data[row,]$payment.date     <<- line$Datum
 			data[row,]$payment.kind     <<- "Bar"
+			data[row,]$payment.type     <<- "Barausgabe"
 			data[row,]$item.kind        <<- title
 			data[row,]$item.date        <<- line$Datum
 			data[row,]$item.description <<- line$Bemerkungen
@@ -324,10 +327,13 @@ add_payment <- function (sheet, title) {
 			data[row,]$remarks          <<- NA
 			data[row,]$responsible      <<- line$Benutzername
 
-			if (line$Bemerkungen == "Geld auf Bank")
-				data[row,]$account <<- account.bank
-			else
+			if (line$Bemerkungen == "Geld auf Bank") {
+				data[row,]$account      <<- account.bank
+				data[row,]$payment.type <<- "Einzahlung"
+			}
+			else {
 				data[row,]$account <<- 0
+			}
 		}
 	}
 }
@@ -353,15 +359,17 @@ add_card_transfers <- function (sheet, title) {
 			data[row,]$bill.date        <<- NA
 			data[row,]$payment.id       <<- line$Nummer
 			data[row,]$payment.date     <<- convert_date (line$Datum)
-			data[row,]$payment.kind     <<- "Überweisung"
+			data[row,]$payment.kind     <<- NA
+			data[row,]$payment.type     <<- "Umbuchung"
 			data[row,]$item.kind        <<- title
 			data[row,]$item.date        <<- convert_date (line$Datum)
 			data[row,]$item.description <<- line$Bemerkungen
 			data[row,]$item.tax         <<- 0
 			data[row,]$customer.id      <<- line$Kundennummer
-			data[row,]$amount           <<- round (line$Betrag, 2)
-			data[row,]$remarks          <<- NA
+			data[row,]$amount           <<- round (-line$Betrag, 2)
+			data[row,]$remarks          <<- "Übertrag EC-Karten-Zahlung"
 			data[row,]$responsible      <<- line$Benutzername
+			data[row,]$account          <<- account.card
 
 			if (!is.na (bill.dates[bill.id]))
 				data[row,]$bill.date <<- bill.dates[bill.id]
@@ -369,6 +377,63 @@ add_card_transfers <- function (sheet, title) {
 		}
 	}
 }
+
+#
+# Generate DATEV representation from intermediate format
+#
+generate_datev <- function () {
+
+	for (i in 1:nrow (data)) {
+		line <- data[i,]
+		row <- nrow (datev) + 1
+
+		datev[row,]$'Umsatz (ohne Soll/Haben-Kz)' <<- abs (line$amount)
+
+		if (line$amount < 0)
+			datev[row,]$'Soll/Haben-Kennzeichen' <<- "S"
+		else
+			datev[row,]$'Soll/Haben-Kennzeichen' <<- "H"
+
+		if (line$item.tax == 19)
+			datev[row,]$'BU-Schlüssel' <<- 3
+		else if (line$item.tax == 7)
+			datev[row,]$'BU-Schlüssel' <<- 2
+
+		datev[row,]$'Konto' <<- line$account
+
+		if (!is.na (line$payment.kind) && line$payment.kind == "Überweisung")
+			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.transfer
+		else
+			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.main
+
+		datev[row,]$'Belegdatum'         <<- format (as.Date (line$payment.date), "%d%m%Y")
+		datev[row,]$'Buchungstext'       <<- line$item.description
+		datev[row,]$'EU-Steuersatz'      <<- line$item.tax
+		datev[row,]$'Zahlweise'          <<- line$payment.kind
+		datev[row,]$'Buchungstyp'        <<- line$payment.type
+		datev[row,]$'Leistungsdatum'     <<- format (as.Date (line$item.date), "%d%m%Y")
+		datev[row,]$'Gesellschaftername' <<- line$responsible
+		datev[row,]$'Sachverhalt'        <<- line$item.kind
+
+		if (!is.na (line$bill.id))
+			datev[row,]$'Buchungstext' <<- paste ("Rechnung ", line$bill.id)
+
+		datev[row,]$'Beleginfo - Art 1'    <<- "Rechnungsnummer"
+		datev[row,]$'Beleginfo - Inhalt 1' <<- line$bill.id
+		datev[row,]$'Beleginfo - Art 2'    <<- "Rechnungsdatum"
+		datev[row,]$'Beleginfo - Inhalt 2' <<- line$bill.date
+		datev[row,]$'Beleginfo - Art 3'    <<- "Vorgangsnummer"
+		datev[row,]$'Beleginfo - Inhalt 3' <<- line$payment.id
+		datev[row,]$'Beleginfo - Art 4'    <<- "Typ"
+		datev[row,]$'Beleginfo - Inhalt 4' <<- line$item.kind
+		datev[row,]$'Beleginfo - Art 5'    <<- "Kundennummer"
+		datev[row,]$'Beleginfo - Inhalt 5' <<- line$customer.id
+		datev[row,]$'Beleginfo - Art 6'    <<- "Bemerkungen"
+		datev[row,]$'Beleginfo - Inhalt 6' <<- line$remarks
+		
+	}
+}
+
 
 #
 # Import sheet 'Zahlungen' and extract customer data per bill number
@@ -424,71 +489,23 @@ sheet.leistungen <- readWorksheetFromFile (input_file, sheet="Leistungen")
 add_turnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
 
 sheet.medikamente.angewendet <- readWorksheetFromFile (input_file, sheet="Medikamente angewendet")
-#add_turnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
+add_turnover (sheet.medikamente.angewendet, title="Medikamente (angewendet)", account.7=8011, account.19=8014)
 
 sheet.medikamente.abgegeben <- readWorksheetFromFile (input_file, sheet="Medikamente abgegeben")
-#add_turnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
+add_turnover (sheet.medikamente.abgegeben, title="Medikamente (abgegeben)", account.7=8021, account.19=8024)
 
 sheet.produkte <- readWorksheetFromFile (input_file, sheet="Produkte")
-#add_turnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
+add_turnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
 
 sheet.cash <- readWorksheetFromFile (input_file, sheet="Zahlungen MwSt")
-#add_payment (sheet.cash, title="Ausgabe")
+add_payment (sheet.cash, title="Ausgabe")
 
-#add_card_transfers (sheet.zahlungen, "Umbuchung EC-Karten-Zahlung")
+add_card_transfers (sheet.zahlungen, "Umbuchung EC-Karten-Zahlung")
 
 #
 # Sort whole table
 #
 #data <- data[order (data$bill.id),]
-
-generate_datev <- function () {
-
-	for (i in 1:nrow (data)) {
-		line <- data[i,]
-		row <- nrow (datev) + 1
-
-		datev[row,]$'Umsatz (ohne Soll/Haben-Kz)' <<- abs (line$amount)
-
-		if (line$amount < 0)
-			datev[row,]$'Soll/Haben-Kennzeichen' <<- "S"
-		else
-			datev[row,]$'Soll/Haben-Kennzeichen' <<- "H"
-
-		if (line$item.tax == 19)
-			datev[row,]$'BU-Schlüssel' <<- 3
-		else if (line$item.tax == 7)
-			datev[row,]$'BU-Schlüssel' <<- 2
-
-		datev[row,]$'Konto'                          <<- line$account
-
-		if (line$payment.kind == "Überweisung")
-			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.transfer
-		else
-			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.main
-
-		datev[row,]$'Belegdatum'                     <<- format (as.Date (line$payment.date), "%d%m%Y")
-		datev[row,]$'Buchungstext'                   <<- line$item.description
-		datev[row,]$'EU-Steuersatz'                  <<- line$item.tax
-		datev[row,]$'Buchungstyp'                    <<- line$payment.kind
-		datev[row,]$'Leistungsdatum'                 <<- format (as.Date (line$item.date), "%d%m%Y")
-		datev[row,]$'Gesellschaftername'             <<- line$responsible
-
-		datev[row,]$'Beleginfo - Art 1'    <<- "Rechnungsnummer"
-		datev[row,]$'Beleginfo - Inhalt 1' <<- line$bill.id
-		datev[row,]$'Beleginfo - Art 2'    <<- "Rechnungsdatum"
-		datev[row,]$'Beleginfo - Inhalt 2' <<- line$bill.date
-		datev[row,]$'Beleginfo - Art 3'    <<- "Vorgangsnummer"
-		datev[row,]$'Beleginfo - Inhalt 3' <<- line$payment.id
-		datev[row,]$'Beleginfo - Art 4'    <<- "Typ"
-		datev[row,]$'Beleginfo - Inhalt 4' <<- line$item.kind
-		datev[row,]$'Beleginfo - Art 5'    <<- "Kundennummer"
-		datev[row,]$'Beleginfo - Inhalt 5' <<- line$customer.id
-		datev[row,]$'Beleginfo - Art 6'    <<- "Bemerkungen"
-		datev[row,]$'Beleginfo - Inhalt 6' <<- line$remarks
-		
-	}
-}
 
 
 generate_datev ()
