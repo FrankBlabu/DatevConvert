@@ -461,7 +461,12 @@ generate_datev <- function () {
 			datev[row,]$'BU-Schlüssel' <<- 2
 
 		datev[row,]$'Konto'                          <<- line$account
-		datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.main
+
+		if (line$payment.kind == "Überweisung")
+			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.transfer
+		else
+			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.main
+
 		datev[row,]$'Belegdatum'                     <<- format (as.Date (line$payment.date), "%d%m%Y")
 		datev[row,]$'Buchungstext'                   <<- line$item.description
 		datev[row,]$'EU-Steuersatz'                  <<- line$item.tax
