@@ -27,11 +27,11 @@ library ("XLConnect")
 # Configuration
 #
 
-#input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-06.xlsx"
-input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-07.xlsx"
+input_file  <- "c:/Users/Frank/Documents/Projects/DatevConvert/buchhaltung-export-2016-08.xlsx"
+#input_file  <- "e:/test/convert/datevconvert/buchhaltung-export-2016-07.xlsx"
 
-#output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-06.csv"
-output_file <- "e:/test/convert/datevconvert/datev-2016-07.csv"
+output_file <- "c:/Users/Frank/Documents/Projects/DatevConvert/datev-2016-08.csv"
+#output_file <- "e:/test/convert/datevconvert/datev-2016-07.csv"
 
 account.main     <- 1001
 account.bank     <- 1360
@@ -46,7 +46,7 @@ payment.dates <- c ()
 bill.dates    <- c ()
 
 #
-# Intermediate frame for listing all entries
+# Intermediate frame for processing all entries
 #
 data <- data.frame (
 	"bill.id"          = character (0), # Id of the bill
@@ -67,7 +67,7 @@ data <- data.frame (
 	stringsAsFactors=FALSE, check.names=FALSE)
 	
 #
-# Datev frame
+# Datev frame for the final output format
 #
 datev <- data.frame (
     "Umsatz (ohne Soll/Haben-Kz)" = numeric (0),      # 0
@@ -191,13 +191,8 @@ datev <- data.frame (
 
 
 #
-# Convert POSIXct date into DATEV string like '0416' for 04-2016
+# Convert data (as.Date () or as.POSIXct ()) into string
 #
-convert_datev_date <- function (date) {
-	d = as.POSIXlt (date)
-	return (sprintf ("%02d%02d", d$mday, d$mon + 1))
-}
-
 convert_date <- function (date) {
 	d <- as.POSIXlt (date)
 	return (sprintf ("%04d-%02d-%02d", 1900 + d$year, d$mon + 1, d$mday))
@@ -260,6 +255,9 @@ add_turnover <- function (sheet, title, account.7, account.19) {
 			data[row,]$responsible      <<- NA
 			data[row,]$account          <<- NA
 
+			#
+			# Insert information we ripped from the sheet 'Zahlungen'
+			#
 			if (!is.na (customer.ids[bill.id]))
 				data[row,]$customer.id <<- customer.ids[bill.id]
 
@@ -327,10 +325,17 @@ add_payment <- function (sheet, title) {
 			data[row,]$remarks          <<- NA
 			data[row,]$responsible      <<- line$Benutzername
 
+			#
+			# Special treatment for deposits from the cash into the bank account
+			#
 			if (startsWith (line$Bemerkungen, "Geld auf Bank")) {
 				data[row,]$account      <<- account.bank
 				data[row,]$payment.type <<- "Einzahlung"
 			}
+
+			#
+			# All other cash payments do not have an account number
+			#
 			else {
 				data[row,]$account <<- 0
 			}
@@ -341,6 +346,9 @@ add_payment <- function (sheet, title) {
 #
 # Withdraw the amount of money gathered via EC card per transaction
 #
+# @param sheet Imported worksheet
+# @param title Sheet title
+#
 add_card_transfers <- function (sheet, title) {
 	
 	s <- sheet[!is.na (sheet$Nummer),]
@@ -348,6 +356,11 @@ add_card_transfers <- function (sheet, title) {
 	for (i in 1:nrow (sheet)) {
 		line <- sheet[i,]
 
+		#
+		# Process all EC card payments which are not canceled out by a matching
+		# payment number ending with 'X'. For each payment, an extra transfer to 
+		# the EC card account is added.
+		#
 		if ( !is.na (line$Nummer) && 
                  !endsWith (line$Nummer, "X") &&
                  nrow (s[s$Nummer == paste (line$Nummer, "X", sep=""),]) == 0 &&
@@ -387,8 +400,15 @@ generate_datev <- function () {
 		line <- data[i,]
 		row <- nrow (datev) + 1
 
+		#
+		# The transferred sum us is always unsigned
+		#
 		datev[row,]$'Umsatz (ohne Soll/Haben-Kz)' <<- abs (line$amount)
 
+		#
+		# 'H' means that the transfer is from 'Konto' to 'Gegenkonto' while
+		# 'S' is the other way round
+		#
 		if (line$amount < 0)
 			datev[row,]$'Soll/Haben-Kennzeichen' <<- "S"
 		else
@@ -401,6 +421,10 @@ generate_datev <- function () {
 
 		datev[row,]$'Konto' <<- line$account
 
+		#
+		# All payments are booked as turnarounds to the cash account. The only
+		# exception are transfers which are going into the transfer account directly.
+		#
 		if (!is.na (line$payment.kind) && line$payment.kind == "Überweisung")
 			datev[row,]$'Gegenkonto (ohne BU-Schlüssel)' <<- account.transfer
 		else
@@ -434,9 +458,16 @@ generate_datev <- function () {
 	}
 }
 
+#----------------------------------------------------------------------------------
+# MAIN
+#----------------------------------------------------------------------------------
+
 
 #
 # Import sheet 'Zahlungen' and extract customer data per bill number
+#
+# Because the dates are eventually converted into integers, the column types
+# have to be specified explicitly.
 #
 sheet.zahlungen <- readWorksheetFromFile (input_file, sheet="Zahlungen", forceConversion=TRUE,
 	colTypes = c (XLC$DATA_TYPE.STRING,   # Rechnungsnummer
@@ -449,6 +480,9 @@ sheet.zahlungen <- readWorksheetFromFile (input_file, sheet="Zahlungen", forceCo
                     XLC$DATA_TYPE.STRING    # Benutzername
 ))
 
+#
+# Iterate over all known bill ids and extract useful information
+#
 payments.all <- sheet.zahlungen[!is.na (sheet.zahlungen$Rechnungsnummer),]
 payment.bill.ids <- levels (factor (payments.all$Rechnungsnummer))
 
@@ -470,7 +504,7 @@ for (bill.id in payment.bill.ids) {
 }
 
 #
-# Import sheet 'Rechnungen' for the correct bill date
+# Import sheet 'Rechnungen' to extract the correct bill date
 # 
 sheet.rechnungen <- readWorksheetFromFile (input_file, sheet="Rechnungen", forceConversion=TRUE)                    
 invoices.all <- sheet.rechnungen[!is.na (sheet.rechnungen$Rechnungsnummer),]
@@ -483,7 +517,8 @@ for (bill.id in invoice.bill.ids) {
 
 
 #
-# Import sheets with relevant data and add them to the internal data representation
+# Import sheets with relevant turnaround and cash payment data and add them to the 
+# internal data representation
 #
 sheet.leistungen <- readWorksheetFromFile (input_file, sheet="Leistungen")
 add_turnover (sheet.leistungen, title="Leistungen", account.7=8004, account.19=8004)
@@ -500,6 +535,9 @@ add_turnover (sheet.produkte, title="Produkte", account.7=8031, account.19=8034)
 sheet.cash <- readWorksheetFromFile (input_file, sheet="Zahlungen MwSt")
 add_payment (sheet.cash, title="Ausgabe")
 
+#
+# Add counter transfers for EC card payments
+#
 add_card_transfers (sheet.zahlungen, "Umbuchung EC-Karten-Zahlung")
 
 #
@@ -515,14 +553,5 @@ generate_datev ()
 #
 output <- datev
 
-#output$'Umsatz (ohne Soll/Haben-Kz)' <- trim (format (round (output$'Umsatz (ohne Soll/Haben-Kz)', 2), nsmall=2, decimal.mark=","))
-
 handle <- file (output_file, encoding="latin1")
 write.table (output, file=handle, row.names=FALSE, quote=FALSE, na="", sep=";", dec=",", qmethod=c("escape", "double"))
-
-
-#
-# Todo: 
-#
-# * Invoice date from table "Rechnungen"
-#
