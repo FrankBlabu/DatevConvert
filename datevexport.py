@@ -18,7 +18,7 @@ import zipfile
 # Round into full euro and cents
 #
 def roundEuro (n):
-    return round (100.0 * n + 0000.1) / 100.0
+    return round (100.0 * n + 0.0001) / 100.0
 
 
 
@@ -283,4 +283,5 @@ with zipfile.ZipFile (sys.argv[1]) as zip:
 invoices = {}
 
 for id in database.range ("invoices"):
-    invoices[id] = Invoice (database, id)
+    if database.get ("invoices", id, "status") == "complete":
+        invoices[id] = Invoice (database, id)
