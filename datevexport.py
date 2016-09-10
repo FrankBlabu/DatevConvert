@@ -153,8 +153,6 @@ class Database:
 # CLASS Invoice
 #---------------------------------------------------------------------
 
-check_id = 3
-
 #
 # This class keeps record about a single invoice, split into different
 # tax related parts
@@ -189,11 +187,15 @@ class Invoice:
         self._total_medication = self.sum_content (database, "invoice_medication", id)
         self._total_service    = self.sum_content (database, "invoice_service", id)
 
-        sum = self._total_products + self._total_medication + self._total_service
+        total = sum (self._total_products.values ()) + \
+                sum (self._total_medication.values ()) + \
+                sum (self._total_service.values ())
 
-        print ("  --> total: " + str (self._total) + ", sum: " + str (sum))
+        print (self._total_medication)
+        
+        print ("  --> total: " + str (self._total) + ", sum: " + str (total))
 
-        assert (round (100 * self._total) == round (100 * sum)) 
+        assert (round (100 * self._total) == round (100 * total)) 
         
 
     #
@@ -202,9 +204,11 @@ class Invoice:
     # @param database   Database we are working with
     # @param file       Database file containing the detailed items
     # @param invoice_id Id of the invoice processed
+    # @return Dictionary of sums with the tax ids as keys
     #
     def sum_content (self, database, file, invoice_id):
-        total = 0.0
+
+        total = {}
 
         for id in database.range (file):
             if int (database.get (file, id, "invoice_id")) == invoice_id:
@@ -220,10 +224,15 @@ class Invoice:
                 count = 1.0
                 if database.has (file, "count"):
                     count = float (database.get (file, id, "count"))
+
+                tax_id = database.get (file, id, "tax_id")
                     
                 price = float (database.get (file, id, "price"))
+
+                if not tax_id in total:
+                    total[tax_id] = 0.0
                 
-                total += roundEuro (amount * factor * count * price)
+                total[tax_id] += roundEuro (amount * factor * count * price)
 
                 print ("  " + file + ", " + str (amount) +
                        " * " + str (factor) +
