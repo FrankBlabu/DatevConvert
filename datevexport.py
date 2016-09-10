@@ -27,9 +27,9 @@ class FileDatabase:
     def __init__ (self, file):
 
         #
-        # Database content
+        # Database content (id, row content)
         #
-        self._data = []
+        self._data = {}
 
         reader = csv.reader (io.TextIOWrapper (file, 'utf-8'), delimiter=',', quotechar='\"')
 
@@ -37,19 +37,49 @@ class FileDatabase:
         header_read = False
     
         for row in reader:
-
             if not header_read:
                 for i in range (len (row)):
                     keys[i] = row[i]
+                    
                 header_read = True
             else:
+                id = None
                 line = {}
-            
+                
                 for i in range (len (row)):
+                    key = keys[i]
+                    
+                    if (key == 'id'):
+                        id = int (row[i])
                     if (row[i] != 'NULL'):
-                        line[keys[i]] = row[i].encode ('utf-8')
+                        line[key] = row[i]
+                    else:
+                        line[key] = ""
 
-                self._data.append (line)
+                assert (id != None)
+                self._data[id] = line
+
+    #
+    # Return single cell content
+    #
+    # @param id   Id of the entry
+    # @param name Name of the column to access
+    #
+    def get (self, id, name):
+        assert (id in self._data)
+
+        data = self._data[id]
+        
+        assert (isinstance (data, dict))
+        assert (name in data)
+
+        return data[name]
+
+    #
+    # Return range of ids present in the file database
+    #
+    def range (self):
+        return self._data.keys ()
 
 
 #---------------------------------------------------------------------
@@ -63,6 +93,24 @@ class Database:
     def __init__ (self):
         self._data = {}
 
+    #
+    # Return single cell content of a file database
+    #
+    # @param database Name of the file database to access
+    # @param id       Id of the entry
+    # @param name     Name of the column to access
+    #
+    def get (self, database, id, name):
+        assert (database in self._data)
+        return self._data[database].get (id, name)
+        
+    #
+    # Return range of ids present in the file database
+    #
+    def range (self, database):
+        assert (database in self._data)
+        return self._data[database].range ()
+    
     #
     # Read new file database and add it to the content
     #
@@ -89,7 +137,6 @@ if len (sys.argv) != 4:
 
 with zipfile.ZipFile (sys.argv[1]) as zip:
     for entry in zip.namelist ():
-        print (entry)
         if (entry.endswith ("clients.csv")):
             with zip.open (entry, 'rU') as file:
                 database.add (file, "clients")
@@ -111,3 +158,12 @@ with zipfile.ZipFile (sys.argv[1]) as zip:
         elif (entry.endswith ("tax.csv")):
             with zip.open (entry, 'rU') as file:
                 database.add (file, "tax")
+
+#
+# Tests
+#
+print (database.get ("clients", 1, "salutation"))
+print (len (database.range ("clients")))
+
+for i in database.range ("clients"):
+    print (database.get ("clients", i, "street"))
