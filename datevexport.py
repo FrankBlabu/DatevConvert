@@ -11,6 +11,17 @@ import time
 import zipfile
 
 #---------------------------------------------------------------------
+# Configuration
+#---------------------------------------------------------------------
+
+class Accounts:
+    Null     = 0000
+    Main     = 1001
+    Bank     = 1360
+    EC       = 1361
+    Transfer = 1362
+
+#---------------------------------------------------------------------
 # Auxillary functions
 #---------------------------------------------------------------------
 
@@ -20,6 +31,11 @@ import zipfile
 def roundEuro (n):
     return round (100.0 * n + 0.0001) / 100.0
 
+#
+# Convert date string representation into Python date class
+#
+def toDate (text):
+    return  time.strptime (text, "%Y-%m-%d %H:%M:%S")
 
 
 #---------------------------------------------------------------------
@@ -145,7 +161,6 @@ class Database:
     # Read new file database and add it to the content
     #
     def add (self, file, name):
-        print ("Add: " + name)
         self._data[name] = FileDatabase (file)
 
 
@@ -181,7 +196,8 @@ class Invoice:
         # Collect parts of the invoice which must sum up to the total and
         # will be used to split the total into the different tax parts
         #
-        print ("Invoice: " + str (id) + " / " + self._number)
+        if False:
+            print ("Invoice: " + str (id) + " / " + self._number)
         
         self._total_products   = self.sum_content (database, "invoice_product", id)
         self._total_medication = self.sum_content (database, "invoice_medication", id)
@@ -191,9 +207,9 @@ class Invoice:
                 sum (self._total_medication.values ()) + \
                 sum (self._total_service.values ())
 
-        print (self._total_medication)
-        
-        print ("  --> total: " + str (self._total) + ", sum: " + str (total))
+
+        if False:
+            print ("  --> total: " + str (self._total) + ", sum: " + str (total))
 
         assert (round (100 * self._total) == round (100 * total)) 
         
@@ -234,16 +250,93 @@ class Invoice:
                 
                 total[tax_id] += roundEuro (amount * factor * count * price)
 
-                print ("  " + file + ", " + str (amount) +
-                       " * " + str (factor) +
-                       " * " + str (count) +
-                       " * " + str (price) +
-                       " = " + str (roundEuro (amount * factor * count * price)) +
-                       " (" + str (amount * factor * count * price) + ")")
+                if False:
+                    print ("  " + file + ", " + str (amount) +
+                           " * " + str (factor) +
+                           " * " + str (count) +
+                           " * " + str (price) +
+                           " = " + str (roundEuro (amount * factor * count * price)) +
+                           " (" + str (amount * factor * count * price) + ")")
 
         return total
                 
-                
+#---------------------------------------------------------------------
+# CLASS DatevEntry
+#---------------------------------------------------------------------
+
+#
+# Class representing a single DATEV file entry
+#
+# Valid fields are:
+#
+# - invoice_id       - Id of the invoice
+# - invoice_date     - Date of the invoice
+# - payment_id       - Id of the payment itself
+# - payment_date     - Date of payment
+# - payment_kind     - Way of payment (cash, card, ...)
+# - payment_type     - Type of payment (transfer, ...)
+# - item_kind        - Kind of item applied/sold
+# - item_date        - Date the item was applied/sold
+# - item_description - Description of the item
+# - item_tax         - Tax of the item
+# - customer_id      - Id of the customer
+# - amount           - Amount of money
+# - remarks          - Payment remarks
+# - responsible      - Name of the responsible person
+# - account          - Account where the money goes to / came from
+class DatevEntry:
+
+    #
+    # Constructor
+    #
+    # @param database   Database we are working with
+    # @param invoices   Parsed invoice database
+    # @param payment_id Id of the payment to be processed
+    #
+    def __init__ (self, database, invoices, payment_id):
+        self._id = payment_id
+
+        #
+        # Case 1: An invoice is involved. The payment has to be split onto the
+        #         invoice parts reducing them entry by entry.
+        #
+        if self.get (database, "invoice_id"):
+            pass
+
+        #
+        # Case 2: No invoice is involved. In this case a payment has been made or
+        #         some kind of transfer took place.
+        #
+        else:
+
+            #
+            # Case 2.1: Cash payment or bank transfer
+            #
+            self._invoice_id       = ""
+            self._invoice_date     = ""
+            self._payment_id       = self.get (database, "id")
+            self._payment_date     = toDate (self.get (database, "date"))
+            self._payment_kind     = self.get (database, "method")
+            self._item_kind        = self.get (database, "paymenttype")
+            self._item_date        = self._payment_date
+            self._item_description = self.get (database, "notes")
+            self._customer_id      = ""
+            self._amount           = round (float (self.get (database, "amount")))
+            self._remarks          = ""
+            self._responsible      = self.get (database, "username")
+
+            if (self.get (database, "paymenttype").lower ().startswith ("geld auf bank")):
+                self._account      = Accounts.Bank
+                self._payment_type = "Einzahlung"
+            else:
+                self._account      = Accounts.Null
+                self._payment_type = "Barausgabe"
+
+    #
+    # Query database for payment entry
+    #
+    def get (self, database, key):
+        return database.get ("payments", self._id, key)
 
 
 #---------------------------------------------------------------------
@@ -262,7 +355,14 @@ if len (sys.argv) != 4:
     sys.stderr.write ('Format: ' + sys.argv[0] + ' <backup zip file> <month (MM)> <year (YYYY)>')
     sys.exit (1)
 
-with zipfile.ZipFile (sys.argv[1]) as zip:
+filename = sys.argv[1]
+month    = int (sys.argv[2])
+year     = int (sys.argv[3])
+    
+#
+#
+#
+with zipfile.ZipFile (filename) as zip:
     for entry in zip.namelist ():
         if (entry.endswith ("clients.csv")):
             with zip.open (entry, 'rU') as file:
@@ -287,10 +387,21 @@ with zipfile.ZipFile (sys.argv[1]) as zip:
                 database.add (file, "tax")
 
 #
-# Generate invoice classes
+# Generate invoice dictionary
 #
 invoices = {}
 
 for id in database.range ("invoices"):
     if database.get ("invoices", id, "status") == "complete":
         invoices[id] = Invoice (database, id)
+
+#
+# Process payment list for the given month
+#
+datev = []
+
+for id in database.range ("payments"):
+    date = toDate (database.get ("payments", id, "date"))
+    if date.tm_year == year and date.tm_mon == month:
+        if roundEuro (float (database.get ("payments", id, "amount"))) != 0:
+            datev.append (DatevEntry (database, invoices, id))
