@@ -4,6 +4,7 @@
 # Syntax: datevexport.py <backup zip file> <month (MM)> <year (YYYY)>
 #
 
+import copy
 import csv
 import io
 import sys
@@ -287,50 +288,60 @@ class Invoice:
 class DatevEntry:
 
     #
-    # Constructor
+    # Constructor (regular payment)
     #
     # @param database   Database we are working with
-    # @param invoices   Parsed invoice database
     # @param payment_id Id of the payment to be processed
     #
-    def __init__ (self, database, invoices, payment_id):
-        self._id = payment_id
+    def __init__ (self, database, payment_id):
 
         #
-        # Case 1: An invoice is involved. The payment has to be split onto the
-        #         invoice parts reducing them entry by entry.
+        # The payment type is not known yet. Setup common fields only.
         #
-        if self.get (database, "invoice_id"):
-            pass
+        self._id               = payment_id
+        self._invoice_id       = ""
+        self._invoice_date     = ""
+        self._payment_id       = payment_id
+        self._payment_date     = toDate (self.get (database, "date"))
+        self._payment_kind     = self.get (database, "method")
+        self._item_kind        = self.get (database, "paymenttype")
+        self._item_date        = self._payment_date
+        self._item_description = self.get (database, "notes")
+        self._item_tax         = ""
+        self._customer_id      = ""
+        self._amount           = round (float (self.get (database, "amount")))
+        self._remarks          = ""
+        self._responsible      = self.get (database, "username")
+        self._account          = Accounts.Null
+        self._payment_type     = ""
 
-        #
-        # Case 2: No invoice is involved. In this case a payment has been made or
-        #         some kind of transfer took place.
-        #
+    #
+    # Setup invoice based payment
+    #
+    def setupInvoiceEntry (self, database):
+        pass
+            
+    #
+    # Setup non invoice payment
+    #
+    def setupNonInvoiceEntry (self, database):
+        if (self.get (database, "paymenttype").lower ().startswith ("geld auf bank")):
+            self._account      = Accounts.Bank
+            self._payment_type = "Einzahlung"
         else:
+            self._account      = Accounts.Null
+            self._payment_type = "Barausgabe"
 
-            #
-            # Case 2.1: Cash payment or bank transfer
-            #
-            self._invoice_id       = ""
-            self._invoice_date     = ""
-            self._payment_id       = self.get (database, "id")
-            self._payment_date     = toDate (self.get (database, "date"))
-            self._payment_kind     = self.get (database, "method")
-            self._item_kind        = self.get (database, "paymenttype")
-            self._item_date        = self._payment_date
-            self._item_description = self.get (database, "notes")
-            self._customer_id      = ""
-            self._amount           = round (float (self.get (database, "amount")))
-            self._remarks          = ""
-            self._responsible      = self.get (database, "username")
 
-            if (self.get (database, "paymenttype").lower ().startswith ("geld auf bank")):
-                self._account      = Accounts.Bank
-                self._payment_type = "Einzahlung"
-            else:
-                self._account      = Accounts.Null
-                self._payment_type = "Barausgabe"
+    #
+    # Setup counter entry for moving another payment via ec card onto a
+    # special account for accounting purposes
+    #
+    def setupECCounterEntry (self):
+        self._account      = Accounts.EC
+        self._payment_type = "Umbuchung"
+        self._remarks      = "Übertrag EC-Karten-Zahlung"
+        pass
 
     #
     # Query database for payment entry
@@ -402,6 +413,44 @@ datev = []
 
 for id in database.range ("payments"):
     date = toDate (database.get ("payments", id, "date"))
+
+    #
+    # Given month only
+    #
     if date.tm_year == year and date.tm_mon == month:
+
+        #
+        # Accountants tax application cannot process payments with 0€ amount
+        #
         if roundEuro (float (database.get ("payments", id, "amount"))) != 0:
-            datev.append (DatevEntry (database, invoices, id))
+
+            #
+            # Skip cancelled payments
+            #
+            if not database.get ("payments", id, "deleted"):
+
+                #
+                # Setup general DATEV entry will all common fields initialized
+                #
+                entry = DatevEntry (database, id)
+
+                #
+                # Case 1: Invoice based payment
+                #
+                if database.get ("payments", id, "invoice_id"):
+                    pass
+
+                #
+                # Case 2: Non invoice based payment
+                #
+                else:
+                    entry.setupNonInvoiceEntry (database);
+                    datev.append (entry)
+
+                #
+                # In case of EC card payments, setup counter entry
+                #
+                if entry._payment_kind == "ec":
+                    counter_entry = copy.deepcopy (entry)
+                    counter_entry.setupECCounterEntry ()
+                    datev.append (counter_entry)
