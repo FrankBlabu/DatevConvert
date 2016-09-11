@@ -20,18 +20,25 @@ import zipfile
 # Account number used for DATEV transfers
 #
 class Accounts:
+
+    #
+    # Target accounts
+    #
     Null     = 0000
     Main     = 1001
     Bank     = 1360
     EC       = 1361
     Transfer = 1362
 
+    #
+    # Source accounts (the accountant calculates with)
+    #
     Services_19            = 8004
     Services_7             = 8004
     Medications_Applied_19 = 8014
     Medications_Applied_7  = 8011
     Medications_19         = 8024
-    Medications_7           = 8021
+    Medications_7          = 8021
     Products_19            = 8034
     Products_7             = 8031
 
@@ -159,7 +166,7 @@ datev_columns = [
     ]
 
 #
-# Readable ids for mapping a semantics to a DATEV columns
+# Readable ids for mapping a semantics to a DATEV column
 #
 datev_column_mapping = {
     'umsatz'            : 1,
@@ -209,7 +216,7 @@ def roundEuro (n):
     return round (100.0 * n + 0.0001) / 100.0
 
 #
-# Convert date string representation into Python date class
+# Convert CSV date string representation into Python date class
 #
 def stringToDate (text):
     return  datetime.datetime.strptime (text, '%Y-%m-%d %H:%M:%S')
@@ -227,7 +234,7 @@ class FileDatabase:
     #
     # Constructor
     #
-    # @param file Opened file containing the CSV data. File content fill be read here.
+    # @param file Opened file containing the CSV data. File content will be read here.
     #
     def __init__ (self, file):
 
@@ -242,11 +249,18 @@ class FileDatabase:
         header_read = False
     
         for row in reader:
+            #
+            # The first row contains the header with the column names
+            #
             if not header_read:
                 for i in range (len (row)):
                     keys[i] = row[i]
                     
                 header_read = True
+
+            #
+            # All other rows create a dictionary with (column name, cell content) items
+            #
             else:
                 id = None
                 line = {}
@@ -271,7 +285,7 @@ class FileDatabase:
     #
     def has (self, key):
         id = list (self._data.keys ())[0]
-        return key in self._data[id];
+        return key in self._data[id]
                 
     #
     # Return single cell content
@@ -394,34 +408,7 @@ class Invoice:
         if False:
             print ('  --> total (invoice): ' + str (self._total) + ', sum (parts): ' + str (total))
 
-        assert round (100 * self._total) == round (100 * total)
-
-    #
-    # Return tax account matching the invoice part configuration
-    #
-    @staticmethod
-    def computeTaxAccount (database, domain, tax_id):
-
-        account = 0
-        tax = float (database.get ('tax', tax_id, 'tax'))
-        
-        #
-        # Hard coced assertion necessary here to map the tax ids to account numbers
-        #
-        assert tax == 19.0 or tax == 7.0
-            
-        if domain == 'products':
-            account = Accounts.Products_19 if tax == 19.0 else Accounts.Products_7
-        elif domain == 'medication':
-            account = Accounts.Medications_19 if tax == 19.0 else Accounts.Medications_7
-        elif domain == 'medication_applied':
-            account = Accounts.Medications_Applied_19 if tax == 19.0 else Accounts.Medications_Applied_7
-        elif domain == 'services':
-            account = Accounts.Services_19 if tax == 19.0 else Accounts.Services_7
-        else:
-            raise "Unknown domain '{}'".format (domain)
-
-        return account
+        assert roundEuro (self._total) == roundEuro (total)
 
     #
     # Sum content of a database file belonging to a given invoice id
@@ -432,15 +419,18 @@ class Invoice:
     # @param invoice_id  Id of the invoice processed
     # @param conditions  Additional conditions for the invoice data set to be
     #                    valid for this case
-    # @return List of invoice parts containig of (domain, tax, sum) maps
+    # @return List of invoice parts consisting of (domain, tax, account, sum) dictionaries
     #
     @staticmethod
     def sumContent (database, domain, file, invoice_id, conditions):
 
+        #
+        # Total computed for each tax case
+        #
         total = {}
 
         #
-        # Iterate over invoice detail entries and process matching entries
+        # Iterate over invoice detail entries and process matching items
         #
         for id in database.range (file):
             if database.get (file, id, 'invoice_id') == invoice_id:
@@ -484,19 +474,22 @@ class Invoice:
                                ' * ' + str (price) +
                                ' = ' + str (roundEuro (amount * factor * count * price)) +
                                ' (' + str (amount * factor * count * price) + ')')
-                        
+
+        #
+        # Generate result entries containing a domain/tax depending set of entries
+        #
         result = []
                     
         for tax_id in total.keys ():
             result.append ({'domain' : domain,
                             'tax'    : tax_id,
                             'account': Invoice.computeTaxAccount (database, domain, tax_id),
-                            'sum'    : total[tax_id]});
+                            'sum'    : total[tax_id]})
                     
         return result
 
     #
-    # Apply payment to invoice and reduce the appropriate items
+    # Apply payment to invoice and reduce the appropriate debt items
     #
     # @param database   Database we are working with
     # @param payment_id Id of the payment to process
@@ -509,7 +502,7 @@ class Invoice:
         #
         # Subtract payment amount from invoice sum. Because the sum is split
         # up in (a) domains (services, products, medication, ) and (b) in
-        # tax rates, the different lists have to be reduces one by one.
+        # tax rates, the different items have to be reduced one by one.
         #
         sum = roundEuro (float (database.get ('payments', payment_id, 'amount')))
         self._open = roundEuro (self._open - sum)
@@ -541,6 +534,39 @@ class Invoice:
                 
         return parts
 
+    #
+    # Return tax account number matching the invoice part configuration
+    #
+    # @param database Database we are working with
+    # @param domain   Domain (products, services, medications, ...)
+    # @param tax_id   Internal ID of the tax used
+    # @return Account number matching the configuration
+    #
+    @staticmethod
+    def computeTaxAccount (database, domain, tax_id):
+
+        account = 0
+        tax = float (database.get ('tax', tax_id, 'tax'))
+        
+        #
+        # Hard coced assertion necessary here to map the tax ids to account numbers
+        #
+        assert tax == 19.0 or tax == 7.0
+            
+        if domain == 'products':
+            account = Accounts.Products_19 if tax == 19.0 else Accounts.Products_7
+        elif domain == 'medication':
+            account = Accounts.Medications_19 if tax == 19.0 else Accounts.Medications_7
+        elif domain == 'medication_applied':
+            account = Accounts.Medications_Applied_19 if tax == 19.0 else Accounts.Medications_Applied_7
+        elif domain == 'services':
+            account = Accounts.Services_19 if tax == 19.0 else Accounts.Services_7
+        else:
+            raise "Unknown domain '{}'".format (domain)
+
+        return account
+
+
     
 #---------------------------------------------------------------------
 # CLASS DatevEntry
@@ -570,7 +596,7 @@ class Invoice:
 class DatevEntry:
 
     #
-    # Constructor (regular payment)
+    # Constructor (all kinds of payments)
     #
     # @param database   Database we are working with
     # @param payment_id Id of the payment to be processed
@@ -602,7 +628,7 @@ class DatevEntry:
     # Setup invoice based payment
     #
     # @param invoice_id    Id of the invoice the payment belongs to
-    # @param configuration Payment configuration as (domain, tax, sum) dictionary
+    # @param configuration Payment configuration as (domain, tax, account, sum) dictionary
     #
     def setupInvoiceEntry (self, database, invoice_id, configuration):
         self._invoice_id = database.get ('invoices', invoice_id, 'number')
@@ -624,11 +650,13 @@ class DatevEntry:
         
         self._item_description = 'Rechnung {}'.format (self._invoice_id)
         self._amount = configuration['sum']
-        
         self._payment_type = "Umsatz"
-
         self._account_from = configuration['account']
 
+        #
+        # Payments via bank transfer are directly assigned to the bank account.
+        # Everything else, including EC card payments,  goes into the main account.
+        #
         if self._payment_kind == 'bill':
             self._account_to = Accounts.Bank
         else:
@@ -669,13 +697,13 @@ class DatevEntry:
         self._item_description = 'Übertrag EC-Karten-Zahlung {}'.format (self._invoice_id)
 
     #
-    # Query database for payment entry
+    # Query database for payment entry (shortcut)
     #
     def get (self, database, key):
         return database.get ('payments', self._id, key)
 
     #
-    # Get DATEV output vector column matching a column id
+    # Get DATEV output vector column index matching a column id
     #
     @staticmethod
     def getColumn (id):
@@ -704,9 +732,9 @@ class DatevEntry:
         else:
             raise "Unknown tax level '{}'".format (self._item_tax)
 
-        row[self.getColumn ('belegdatum')]         = self._payment_date.strftime ('%d%m%Y')
-        row[self.getColumn ('buchungstext')]       = self._item_description
-        row[self.getColumn ('eu_steuersatz')]      = self._item_tax
+        row[self.getColumn ('belegdatum')]    = self._payment_date.strftime ('%d%m%Y')
+        row[self.getColumn ('buchungstext')]  = self._item_description
+        row[self.getColumn ('eu_steuersatz')] = self._item_tax
 
         if self._payment_kind == 'ec':
             row[self.getColumn ('zahlweise')] = 'EC-Karte'
@@ -756,6 +784,8 @@ class DatevEntry:
 #
 # Configuration
 #
+# German locale for '1,23' like decimal points
+#
 locale.setlocale (locale.LC_ALL, "German")
 
 #
@@ -776,14 +806,11 @@ year     = int (sys.argv[3])
 output   = sys.argv[4]
     
 #
-# Read relevant CSV files from backup into database
+# Read relevant CSV files from backup ZIP file into database
 #
 with zipfile.ZipFile (filename) as zip:
     for entry in zip.namelist ():
-        if (entry.endswith ('clients.csv')):
-            with zip.open (entry, 'rU') as file:
-                database.add (file, 'clients')
-        elif (entry.endswith ('invoices.csv')):
+        if (entry.endswith ('invoices.csv')):
             with zip.open (entry, 'rU') as file:
                 database.add (file, 'invoices')
         elif (entry.endswith ('invoice_medication.csv')):
@@ -803,12 +830,14 @@ with zipfile.ZipFile (filename) as zip:
                 database.add (file, 'tax')
 
 #
-# Generate invoice dictionary
+# Generate invoice handling instances
 #
 invoices = {}
 
 for invoice_id in database.range ('invoices'):
+
     if database.get ('invoices', invoice_id, 'status') == 'complete':        
+
         #
         # Generate complete invoice information
         #
@@ -818,9 +847,13 @@ for invoice_id in database.range ('invoices'):
             print ("Invoice #" + str (invoice_id) + " (" + invoice._number + "): " + str (invoice._open))
         
         #
-        # Reduce invoice by payments already performed in previous month
+        # Reduce invoice by payments already performed in previous months
         #
         for payment_id in database.range ('payments'):
+
+            #
+            # Use only payments for the processed invoice and skip cancelled payments at all
+            #
             if not database.get ('payments', payment_id, 'deleted'):
                 payment_invoice_id = database.get ('payments', payment_id, 'invoice_id')
                 if payment_invoice_id and (payment_invoice_id == invoice_id):
@@ -841,6 +874,7 @@ for invoice_id in database.range ('invoices'):
 datev = []
 
 for payment_id in database.range ('payments'):
+    
     date = stringToDate (database.get ('payments', payment_id, 'date'))
 
     #
@@ -861,27 +895,29 @@ for payment_id in database.range ('payments'):
                 invoice_id = database.get ('payments', payment_id, 'invoice_id')                
                     
                 #
-                # Setup general DATEV entry with all common fields initialized
-                #
-
-                #
                 # Case 1: Invoice based payment
                 #
                 if invoice_id:
                     assert invoice_id in invoices
 
+                    #
+                    # The invoice debt is reduced by the payment just made. The paid parts
+                    # are returned in this process and will be used to generate a single
+                    # DATEV entry for each part.
+                    #
                     parts = invoices[invoice_id].applyPayment (database, payment_id)
+                    
                     for part in parts:
                         entry = DatevEntry (database, payment_id)
                         entry.setupInvoiceEntry (database, invoice_id, part)
                         datev.append (entry)
 
                 #
-                # Case 2: Non invoice based payment
+                # Case 2: Non-invoice based payment
                 #
                 else:
                     entry = DatevEntry (database, payment_id)
-                    entry.setupNonInvoiceEntry ();
+                    entry.setupNonInvoiceEntry ()
                     datev.append (entry)
 
                 #
@@ -891,6 +927,7 @@ for payment_id in database.range ('payments'):
                     entry = DatevEntry (database, payment_id)
                     entry.setupECCounterEntry (database, invoice_id)
                     datev.append (entry)
+
 
 #
 # Extract result as DATEV file
