@@ -6,9 +6,9 @@
 
 import copy
 import csv
+import datetime
 import io
 import sys
-import time
 import zipfile
 
 #---------------------------------------------------------------------
@@ -28,7 +28,7 @@ class Accounts:
 #
 # DATEV table column headers
 #
-datev_headers = [
+datev_columns = [
     "Umsatz (ohne Soll/Haben-Kz)",    #1
     "Soll/Haben-Kennzeichen",         #2
     "WKZ Umsatz",                     #3
@@ -148,7 +148,7 @@ datev_headers = [
     ]
 
 #
-# Readable keys for mapping a semantics to a DATEV columns
+# Readable ids for mapping a semantics to a DATEV columns
 #
 datev_column_mapping = {
     'umsatz'            : 1,
@@ -200,8 +200,8 @@ def roundEuro (n):
 #
 # Convert date string representation into Python date class
 #
-def toDate (text):
-    return  time.strptime (text, "%Y-%m-%d %H:%M:%S")
+def stringToDate (text):
+    return  datetime.datetime.strptime (text, "%Y-%m-%d %H:%M:%S")
 
 
 #---------------------------------------------------------------------
@@ -355,7 +355,7 @@ class Invoice:
         self._number    = database.get ("invoices", id, "number")
 
         date = database.get ("invoices", id, "date")
-        self._date  = time.strptime (date, '%Y-%m-%d') if date else None
+        self._date  = datetime.datetime.strptime (date, '%Y-%m-%d') if date else None
         self._total = float (database.get ("invoices", id, "total"))
 
         #
@@ -467,14 +467,14 @@ class DatevEntry:
         self._invoice_id       = ""
         self._invoice_date     = ""
         self._payment_id       = payment_id
-        self._payment_date     = toDate (self.get (database, "date"))
+        self._payment_date     = stringToDate (self.get (database, "date"))
         self._payment_kind     = self.get (database, "method")
         self._item_kind        = self.get (database, "paymenttype")
         self._item_date        = self._payment_date
         self._item_description = self.get (database, "notes")
         self._item_tax         = ""
         self._customer_id      = ""
-        self._amount           = round (float (self.get (database, "amount")))
+        self._amount           = roundEuro (float (self.get (database, "amount")))
         self._remarks          = ""
         self._responsible      = self.get (database, "username")
         self._account          = Accounts.Null
@@ -515,10 +515,59 @@ class DatevEntry:
         return database.get ("payments", self._id, key)
 
     #
+    # Get DATEV output vector column matching a column id
+    #
+    @staticmethod
+    def getColumn (id):
+        assert (id in datev_column_mapping)
+        return datev_column_mapping[id] - 1
+    
+    #
     # Convert entry into vector of DATEV rows
     #
+    # @return Vector containing all DATEV colunms for this entry
+    #
     def toDatev (self):
-        pass
+        row = [''] * len (datev_columns)
+
+        row[self.getColumn ('umsatz')]        = abs (self._amount)
+        row[self.getColumn ('soll_haben')]    = 'S' if self._amount < 0 else 'H'
+        row[self.getColumn ('konto')]         = self._account
+        row[self.getColumn ('gegenkonto')]    = Accounts.Transfer if self._payment_kind == 'bill' else Accounts.Main
+
+        row[self.getColumn ('bu_schluessel')] = None
+        if self._item_tax == 19:
+            row[self.getColumn ('bu_schluessel')] = 3
+        elif self._item_tax == 7:
+            row[self.getColumn ('bu_schluessel')] = 2
+
+        row[self.getColumn ('belegdatum')]         = self._payment_date.strftime ('%d%m%Y')
+        row[self.getColumn ('buchungstext')]       = self._item_description
+        row[self.getColumn ('eu_steuersatz')]      = self._item_tax
+        row[self.getColumn ('zahlweise')]          = self._payment_kind
+        row[self.getColumn ('buchungstyp')]        = self._payment_type
+        row[self.getColumn ('leistungsdatum')]     = self._item_date.strftime ('%d%m%Y')
+        row[self.getColumn ('gesellschaftername')] = self._responsible
+        row[self.getColumn ('sachverhalt')]        = self._item_kind
+
+        if self._invoice_id:
+            row[self.getColumn ('buchungstext')]   = 'Rechnung ' + self._invoice_id
+
+        row[self.getColumn ('beleginfo_art_1')]    = "Rechnungsnummer"
+        row[self.getColumn ('beleginfo_inhalt_1')] = self._invoice_id
+        row[self.getColumn ('beleginfo_art_1')]    = "Rechnungsdatum"
+        row[self.getColumn ('beleginfo_inhalt_1')] = self._invoice_date
+        row[self.getColumn ('beleginfo_art_1')]    = "Vorgangsnummer"
+        row[self.getColumn ('beleginfo_inhalt_1')] = self._payment_id
+        row[self.getColumn ('beleginfo_art_1')]    = "Typ"
+        row[self.getColumn ('beleginfo_inhalt_1')] = self._item_kind
+        row[self.getColumn ('beleginfo_art_1')]    = "Kundennummer"
+        row[self.getColumn ('beleginfo_inhalt_1')] = self._customer_id
+        row[self.getColumn ('beleginfo_art_1')]    = "Bemerkungen"
+        row[self.getColumn ('beleginfo_inhalt_1')] = self._remarks
+
+        return row
+
     
 #---------------------------------------------------------------------
 # MAIN
@@ -583,12 +632,12 @@ for id in database.range ("invoices"):
 datev = []
 
 for id in database.range ("payments"):
-    date = toDate (database.get ("payments", id, "date"))
+    date = stringToDate (database.get ("payments", id, "date"))
 
     #
     # Given month only
     #
-    if date.tm_year == year and date.tm_mon == month:
+    if date.year == year and date.month == month:
 
         #
         # Accountants tax application cannot process payments with 0€ amount
@@ -632,5 +681,7 @@ for id in database.range ("payments"):
 with open (output, 'w', newline='') as file:
     writer = csv.writer (file, dialect='excel')
 
+    writer.writerow (datev_columns)
+    
     for entry in datev:
         writer.writerow (entry.toDatev ())
