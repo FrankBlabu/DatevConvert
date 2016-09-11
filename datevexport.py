@@ -30,8 +30,8 @@ class Accounts:
     Services_7             = 8004
     Medications_Applied_19 = 8014
     Medications_Applied_7  = 8011
-    Medications_Sold_19    = 8024
-    Medications_Sold_7     = 8021
+    Medications_19         = 8024
+    Medications_7           = 8021
     Products_19            = 8034
     Products_7             = 8031
 
@@ -293,7 +293,7 @@ class FileDatabase:
     # Return range of ids present in the file database
     #
     def range (self):
-        return self._data.keys ()
+        return sorted (self._data.keys ())
 
 
 #---------------------------------------------------------------------
@@ -362,6 +362,7 @@ class Invoice:
         # Gather some information about the invoice itself
         #
         self._id = id
+        self._number = database.get ('invoices', id, 'number')
 
         self._total = float (database.get ('invoices', id, 'total'))
         self._open = self._total
@@ -374,9 +375,10 @@ class Invoice:
             print ('Invoice: ' + str (id) + ' (' + self._number + ')')
 
         self._debt = []        
-        self._debt += self.sumContent (database, 'products', 'invoice_product', id)
-        self._debt += self.sumContent (database, 'medication', 'invoice_medication', id)
-        self._debt += self.sumContent (database, 'services', 'invoice_service', id)
+        self._debt += self.sumContent (database, 'products',           'invoice_product',    id, {})
+        self._debt += self.sumContent (database, 'medication',         'invoice_medication', id, {'applied': 0})
+        self._debt += self.sumContent (database, 'medication_applied', 'invoice_medication', id, {'applied': 1})
+        self._debt += self.sumContent (database, 'services',           'invoice_service',    id, {})
 
         #
         # IMPORTANT OPTIMIZATION: Lower tax items are processed FIRST because if
@@ -411,6 +413,8 @@ class Invoice:
         if domain == 'products':
             account = Accounts.Products_19 if tax == 19.0 else Accounts.Products_7
         elif domain == 'medication':
+            account = Accounts.Medications_19 if tax == 19.0 else Accounts.Medications_7
+        elif domain == 'medication_applied':
             account = Accounts.Medications_Applied_19 if tax == 19.0 else Accounts.Medications_Applied_7
         elif domain == 'services':
             account = Accounts.Services_19 if tax == 19.0 else Accounts.Services_7
@@ -426,10 +430,12 @@ class Invoice:
     # @param domain     Item domain (product, service, medication, ...)
     # @param file       Database file containing the detailed items
     # @param invoice_id Id of the invoice processed
+    # @param condition  Additional conditions for the invoice data set to be
+    #                   valid for this case
     # @return List of invoice parts containig of (domain, tax, sum) maps
     #
     @staticmethod
-    def sumContent (database, domain, file, invoice_id):
+    def sumContent (database, domain, file, invoice_id, condition):
 
         total = {}
 
@@ -590,26 +596,46 @@ class DatevEntry:
         self._customer_id = database.get ('invoices', invoice_id, 'client_id')
 
         self._item_tax = database.get ('tax', configuration['tax'], 'tax')
-        self._item_kind = configuration['domain']
+
+        if configuration['domain'] == 'services':
+            self._item_kind = 'Leistungen'
+        elif configuration['domain'] == 'products':
+            self._item_kind = 'Produkte'
+        elif configuration['domain'] == 'medication':
+            self._item_kind = 'Medikamente (abgegeben)'
+        elif configuration['domain'] == 'medication_applied':
+            self._item_kind = 'Medikamente (angewendet)'
+        else:
+            self._item_kind = configuration['domain']
+        
+        self._item_description = 'Rechnung {}'.format (self._invoice_id)
         self._amount = configuration['sum']
         
         self._payment_type = "Umsatz"
 
         self._account_from = configuration['account']
-        self._account_to = Accounts.Main
+
+        if self._payment_kind == 'bill':
+            self._account_to = Accounts.Bank
+        else:
+            self._account_to = Accounts.Main
         
     #
     # Setup non invoice payment
     #
     def setupNonInvoiceEntry (self):
         if self._item_kind.lower ().startswith ('geld auf bank'):
-            self._account_from = Accounts.Bank
-            self._account_to   = Accounts.Main
-            self._payment_type = 'Einzahlung'
+            self._account_from     = Accounts.Bank
+            self._account_to       = Accounts.Main
+            self._payment_type     = 'Umbuchung'
+            self._item_kind        = 'Einzahlung'
+            self._item_description = 'Geld auf Bank'
         else:
             self._account_from = Accounts.Null
             self._account_to   = Accounts.Main
-            self._payment_type = 'Barausgabe'
+            self._payment_type = 'Barentnahme'
+            self._remarks      = self._item_kind
+            self._item_kind    = 'Barausgabe'
 
 
     #
@@ -617,15 +643,16 @@ class DatevEntry:
     # special account for accounting purposes
     #
     def setupECCounterEntry (self, database, invoice_id):
-        self._invoice_id   = database.get ('invoices', invoice_id, 'number')
-        self._invoice_date = database.get ('invoices', invoice_id, 'date')
-        self._customer_id  = database.get ('invoices', invoice_id, 'client_id')
-        self._amount       = -1.0 * self._amount
-        self._account_from = Accounts.EC
-        self._account_to   = Accounts.Main
-        self._payment_type = 'Umbuchung'
-        self._remarks      = 'Übertrag EC-Karten-Zahlung'
-        self._item_kind    = 'Umbuchung'
+        self._invoice_id       = database.get ('invoices', invoice_id, 'number')
+        self._invoice_date     = database.get ('invoices', invoice_id, 'date')
+        self._customer_id      = database.get ('invoices', invoice_id, 'client_id')
+        self._amount           = -1.0 * self._amount
+        self._account_from     = Accounts.EC
+        self._account_to       = Accounts.Main
+        self._payment_type     = 'Umbuchung'
+        self._remarks          = 'Übertrag EC-Karten-Zahlung'
+        self._item_kind        = 'Umbuchung'
+        self._item_description = 'Übertrag EC-Karten-Zahlung {}'.format (self._invoice_id)
 
     #
     # Query database for payment entry
@@ -654,36 +681,56 @@ class DatevEntry:
         row[self.getColumn ('konto')]         = self._account_from
         row[self.getColumn ('gegenkonto')]    = self._account_to
 
-        row[self.getColumn ('bu_schluessel')] = None
-        if self._item_tax == 19:
+        if not self._item_tax:
+            row[self.getColumn ('bu_schluessel')] = None
+        elif float (self._item_tax) == 19.0:
             row[self.getColumn ('bu_schluessel')] = 3
-        elif self._item_tax == 7:
+        elif float (self._item_tax) == 7.0:
             row[self.getColumn ('bu_schluessel')] = 2
+        else:
+            raise "Unknown tax level '{}'".format (self._item_tax)
 
         row[self.getColumn ('belegdatum')]         = self._payment_date.strftime ('%d%m%Y')
         row[self.getColumn ('buchungstext')]       = self._item_description
         row[self.getColumn ('eu_steuersatz')]      = self._item_tax
-        row[self.getColumn ('zahlweise')]          = self._payment_kind
+
+        if self._payment_kind == 'ec':
+            row[self.getColumn ('zahlweise')] = 'EC-Karte'
+        elif self._payment_kind == 'cash':
+            row[self.getColumn ('zahlweise')] = 'Bar'
+        elif self._payment_kind == 'bill':
+            row[self.getColumn ('zahlweise')] = 'Überweisung'
+        else:
+            raise "Unknown payment type '{}'".format (self._payment_kind)
+        
         row[self.getColumn ('buchungstyp')]        = self._payment_type
         row[self.getColumn ('leistungsdatum')]     = self._item_date.strftime ('%d%m%Y')
         row[self.getColumn ('gesellschaftername')] = self._responsible
         row[self.getColumn ('sachverhalt')]        = self._item_kind
 
         if self._invoice_id:
-            row[self.getColumn ('buchungstext')]   = 'Rechnung ' + self._invoice_id
+            row[self.getColumn ('beleginfo_art_1')]    = 'Rechnungsnummer'
+            row[self.getColumn ('beleginfo_inhalt_1')] = self._invoice_id
+            
+        if self._invoice_date:
+            row[self.getColumn ('beleginfo_art_2')]    = 'Rechnungsdatum'
+            row[self.getColumn ('beleginfo_inhalt_2')] = self._invoice_date
+            
+        if self._payment_id:
+            row[self.getColumn ('beleginfo_art_3')]    = 'Vorgangsnummer'
+            row[self.getColumn ('beleginfo_inhalt_3')] = self._payment_id
 
-        row[self.getColumn ('beleginfo_art_1')]    = 'Rechnungsnummer'
-        row[self.getColumn ('beleginfo_inhalt_1')] = self._invoice_id
-        row[self.getColumn ('beleginfo_art_1')]    = 'Rechnungsdatum'
-        row[self.getColumn ('beleginfo_inhalt_1')] = self._invoice_date
-        row[self.getColumn ('beleginfo_art_1')]    = 'Vorgangsnummer'
-        row[self.getColumn ('beleginfo_inhalt_1')] = self._payment_id
-        row[self.getColumn ('beleginfo_art_1')]    = 'Typ'
-        row[self.getColumn ('beleginfo_inhalt_1')] = self._item_kind
-        row[self.getColumn ('beleginfo_art_1')]    = 'Kundennummer'
-        row[self.getColumn ('beleginfo_inhalt_1')] = self._customer_id
-        row[self.getColumn ('beleginfo_art_1')]    = 'Bemerkungen'
-        row[self.getColumn ('beleginfo_inhalt_1')] = self._remarks
+        if self._item_kind:
+            row[self.getColumn ('beleginfo_art_4')]    = 'Typ'
+            row[self.getColumn ('beleginfo_inhalt_4')] = self._item_kind
+
+        if self._customer_id:
+            row[self.getColumn ('beleginfo_art_5')]    = 'Kundennummer'
+            row[self.getColumn ('beleginfo_inhalt_5')] = self._customer_id
+
+        if self._remarks:
+            row[self.getColumn ('beleginfo_art_6')]    = 'Bemerkungen'
+            row[self.getColumn ('beleginfo_inhalt_6')] = self._remarks
 
         return row
 
