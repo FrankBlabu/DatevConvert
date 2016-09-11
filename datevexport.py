@@ -395,7 +395,7 @@ class Invoice:
     # @return List of invoice parts containig of (domain, tax, sum) maps
     #
     @staticmethod
-    def sumContent (self, database, domain, file, invoice_id):
+    def sumContent (database, domain, file, invoice_id):
 
         total = {}
 
