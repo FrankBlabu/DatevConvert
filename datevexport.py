@@ -545,7 +545,8 @@ class Invoice:
 # - amount           - Amount of money
 # - remarks          - Payment remarks
 # - responsible      - Name of the responsible person
-# - account          - Account where the money goes to / came from
+# - account_from     - Account where the money came from
+# - account_to       - Account where the money goes to
 class DatevEntry:
 
     #
@@ -573,7 +574,8 @@ class DatevEntry:
         self._amount           = roundEuro (float (self.get (database, 'amount')))
         self._remarks          = ''
         self._responsible      = self.get (database, 'username')
-        self._account          = Accounts.Null
+        self._account_from     = Accounts.Null
+        self._account_to       = Accounts.Null
         self._payment_type     = ''
 
     #
@@ -592,16 +594,21 @@ class DatevEntry:
         self._amount = configuration['sum']
         
         self._payment_type = "Umsatz"
+
+        self._account_from = configuration['account']
+        self._account_to = Accounts.Main
         
     #
     # Setup non invoice payment
     #
     def setupNonInvoiceEntry (self):
         if self._item_kind.lower ().startswith ('geld auf bank'):
-            self._account      = Accounts.Bank
+            self._account_from = Accounts.Bank
+            self._account_to   = Accounts.Main
             self._payment_type = 'Einzahlung'
         else:
-            self._account      = Accounts.Null
+            self._account_from = Accounts.Null
+            self._account_to   = Accounts.Main
             self._payment_type = 'Barausgabe'
 
 
@@ -609,10 +616,16 @@ class DatevEntry:
     # Setup counter entry for moving another payment via ec card onto a
     # special account for accounting purposes
     #
-    def setupECCounterEntry (self):
-        self._account      = Accounts.EC
+    def setupECCounterEntry (self, database, invoice_id):
+        self._invoice_id   = database.get ('invoices', invoice_id, 'number')
+        self._invoice_date = database.get ('invoices', invoice_id, 'date')
+        self._customer_id  = database.get ('invoices', invoice_id, 'client_id')
+        self._amount       = -1.0 * self._amount
+        self._account_from = Accounts.EC
+        self._account_to   = Accounts.Main
         self._payment_type = 'Umbuchung'
         self._remarks      = 'Übertrag EC-Karten-Zahlung'
+        self._item_kind    = 'Umbuchung'
 
     #
     # Query database for payment entry
@@ -638,8 +651,8 @@ class DatevEntry:
 
         row[self.getColumn ('umsatz')]        = locale.format ("%.2f", abs (self._amount))
         row[self.getColumn ('soll_haben')]    = 'S' if self._amount < 0 else 'H'
-        row[self.getColumn ('konto')]         = self._account
-        row[self.getColumn ('gegenkonto')]    = Accounts.Transfer if self._payment_kind == 'bill' else Accounts.Main
+        row[self.getColumn ('konto')]         = self._account_from
+        row[self.getColumn ('gegenkonto')]    = self._account_to
 
         row[self.getColumn ('bu_schluessel')] = None
         if self._item_tax == 19:
@@ -784,6 +797,8 @@ for payment_id in database.range ('payments'):
             #
             if not database.get ('payments', payment_id, 'deleted'):
 
+                invoice_id = database.get ('payments', payment_id, 'invoice_id')                
+                    
                 #
                 # Setup general DATEV entry with all common fields initialized
                 #
@@ -791,8 +806,7 @@ for payment_id in database.range ('payments'):
                 #
                 # Case 1: Invoice based payment
                 #
-                if database.get ('payments', payment_id, 'invoice_id'):
-                    invoice_id = database.get ('payments', payment_id, 'invoice_id')
+                if invoice_id:
                     assert invoice_id in invoices
 
                     parts = invoices[invoice_id].applyPayment (database, payment_id)
@@ -814,7 +828,7 @@ for payment_id in database.range ('payments'):
                 #
                 if database.get ('payments', payment_id, 'method') == 'ec':
                     entry = DatevEntry (database, payment_id)
-                    entry.setupECCounterEntry ()
+                    entry.setupECCounterEntry (database, invoice_id)
                     datev.append (entry)
 
 #
