@@ -255,7 +255,7 @@ class FileDatabase:
                     key = keys[i]
                     
                     if (key == 'id'):
-                        id = int (row[i])
+                        id = row[i]
                     if (row[i] != 'NULL'):
                         line[key] = row[i]
                     else:
@@ -383,7 +383,7 @@ class Invoice:
         # a customer does only pay a part of an invoice, we will have to pay
         # less taxes at least.
         #
-        self._debt.sort (key=lambda entry: float (database.get ('tax', int (entry['tax']), 'tax')))
+        self._debt.sort (key=lambda entry: float (database.get ('tax', entry['tax'], 'tax')))
 
         total = 0.0
         for item in self._debt:
@@ -401,7 +401,7 @@ class Invoice:
     def computeTaxAccount (database, domain, tax_id):
 
         account = 0
-        tax = float (database.get ('tax', int (tax_id), 'tax'))
+        tax = float (database.get ('tax', tax_id, 'tax'))
         
         #
         # Hard coced assertion necessary here to map the tax ids to account numbers
@@ -434,7 +434,7 @@ class Invoice:
         total = {}
 
         for id in database.range (file):
-            if int (database.get (file, id, 'invoice_id')) == invoice_id:
+            if database.get (file, id, 'invoice_id') == invoice_id:
 
                 amount = 1.0
                 if database.has (file, 'amount'):
@@ -587,7 +587,7 @@ class DatevEntry:
         self._invoice_date = database.get ('invoices', invoice_id, 'date')
         self._customer_id = database.get ('invoices', invoice_id, 'client_id')
 
-        self._item_tax = database.get ('tax', int (configuration['tax']), 'tax')
+        self._item_tax = database.get ('tax', configuration['tax'], 'tax')
         self._item_kind = configuration['domain']
         self._amount = configuration['sum']
         
@@ -749,7 +749,7 @@ for invoice_id in database.range ('invoices'):
         for payment_id in database.range ('payments'):
             if not database.get ('payments', payment_id, 'deleted'):
                 payment_invoice_id = database.get ('payments', payment_id, 'invoice_id')
-                if payment_invoice_id and (int (payment_invoice_id) == invoice_id):
+                if payment_invoice_id and (payment_invoice_id == invoice_id):
                     date = stringToDate (database.get ('payments', payment_id, 'date'))
                 
                     if date.year <= year and date.month < month:
@@ -792,7 +792,7 @@ for payment_id in database.range ('payments'):
                 # Case 1: Invoice based payment
                 #
                 if database.get ('payments', payment_id, 'invoice_id'):
-                    invoice_id = int (database.get ('payments', payment_id, 'invoice_id'))
+                    invoice_id = database.get ('payments', payment_id, 'invoice_id')
                     assert invoice_id in invoices
 
                     parts = invoices[invoice_id].applyPayment (database, payment_id)
