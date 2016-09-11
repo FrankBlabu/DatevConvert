@@ -78,7 +78,7 @@ datev <- data.frame (
     "WKZ Basis-Umsatz" = double (0),                  # 5
     "Konto" = character (0),                          # 6
     "Gegenkonto (ohne BU-Schlüssel)" = character (0), # 7
-    "BU-Schlüssel" = character (0),                   # 8
+    "BU-Schlüssel" = character (0),                # 8
     "Belegdatum" = character (0),                     # 9
     "Belegfeld 1" = character (0),                    # 10
     "Belegfeld 2" = character (0),                    # 11
@@ -86,7 +86,7 @@ datev <- data.frame (
     "Buchungstext" = character (0),                   # 13
     "Postensperre" = character(0),                    # 14
     "Diverse Adressnummer" = character (0),           # 15
-    "Geschäftspartnerbank" = character (0),           # 16
+    "Geschäftspartnerbank" = character (0),        # 16
     "Sachverhalt" = character (0),                    # 17
     "Zinssperre" = character (0),                     # 18
     "Beleglink" = character (0),                      # 19
@@ -113,10 +113,10 @@ datev <- data.frame (
     "EU-Steuersatz" = double (0),                     # 40
     "Abw. Versteuerungsart" = character (0),          # 41
     "Sachverhalt L+L" = character (0),                # 42
-    "Funktionsergänzung L+L" = character (0),         # 43
+    "Funktionsergänzung L+L" = character (0),      # 43
     "BU 49 Hauptfunktionstyp" = character (0),        # 44
     "BU 49 Hauptfunktionsnummer" = character (0),     # 45
-    "BU 49 Funktionsergänzung" = character (0),       # 46
+    "BU 49 Funktionsergänzung" = character (0)     # 46
     "Zusatzinformation - Art 1" = character (0),      # 47
     "Zusatzinformation- Inhalt 1" = character (0),    # 48
     "Zusatzinformation - Art 2" = character (0),      # 49
@@ -157,7 +157,7 @@ datev <- data.frame (
     "Zusatzinformation- Inhalt 19" = character (0),   # 84
     "Zusatzinformation - Art 20" = character (0),     # 85
     "Zusatzinformation- Inhalt 20" = character (0),   # 86
-    "Stück" = integer (0),                            # 87
+    "Stück" = integer (0),                         # 87
     "Gewicht" = double (0),                           # 88
     "Zahlweise" = character (0),                      # 89
     "Forderungsart" = character (0),                  # 90
@@ -166,11 +166,11 @@ datev <- data.frame (
     "Skontotyp" = character (0),                      # 93
     "Auftragsnummer" = character (0),                 # 94
     "Buchungstyp" = character (0),                    # 95
-    "USt-Schlüssel (Anzahlungen)" = double (0),       # 96
+    "USt-Schlüssel (Anzahlungen)" = double (0),    # 96
     "EU-Land (Anzahlungen)" = character (0),          # 97
     "Sachverhalt L+L (Anzahlungen)" = double (0),     # 98
     "EU-Steuersatz (Anzahlungen)" = double (0),       # 99
-    "Erlöskonto (Anzahlungen)" = double (0),          # 100
+    "Erlöskonto (Anzahlungen)" = double (0),       # 100
     "Herkunft-Kz" = double (0),                       # 101
     "Buchungs GUID" = double (0),                     # 102
     "KOST-Datum" = as.Date (character ()),            # 103

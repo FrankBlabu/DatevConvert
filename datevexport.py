@@ -1,7 +1,7 @@
 #
 # datevexport.py - Test for a valid DATEV conversion and export
 #
-# Syntax: datevexport.py <backup zip file> <month (MM)> <year (YYYY)>
+# Syntax: datevexport.py <backup zip file> <month (MM)> <year (YYYY)> <output file>
 #
 
 import copy
@@ -15,6 +15,9 @@ import zipfile
 # Configuration
 #---------------------------------------------------------------------
 
+#
+# Account number used for DATEV transfers
+#
 class Accounts:
     Null     = 0000
     Main     = 1001
@@ -22,6 +25,168 @@ class Accounts:
     EC       = 1361
     Transfer = 1362
 
+#
+# DATEV table column headers
+#
+datev_headers = [
+    "Umsatz (ohne Soll/Haben-Kz)",    #1
+    "Soll/Haben-Kennzeichen",         #2
+    "WKZ Umsatz",                     #3
+    "Kurs",                           #4
+    "Basis-Umsatz",                   #5
+    "WKZ Basis-Umsatz",               #6
+    "Konto",                          #7
+    "Gegenkonto (ohne BU-Schlüssel)", #8
+    "BU-Schlüssel",                   #9
+    "Belegdatum",                     #10
+    "Belegfeld 1",                    #11
+    "Belegfeld 2",                    #12
+    "Skonto",                         #13
+    "Buchungstext",                   #14
+    "Postensperre",                   #15
+    "Diverse Adressnummer",           #16
+    "Geschäftspartnerbank",           #17
+    "Sachverhalt",                    #18
+    "Zinssperre",                     #19
+    "Beleglink",                      #20
+    "Beleginfo - Art 1",              #21
+    "Beleginfo - Inhalt 1",           #22
+    "Beleginfo - Art 2",              #23
+    "Beleginfo - Inhalt 2",           #24
+    "Beleginfo - Art 3",              #25
+    "Beleginfo - Inhalt 3",           #26
+    "Beleginfo - Art 4",              #27
+    "Beleginfo - Inhalt 4",           #28
+    "Beleginfo - Art 5",              #29
+    "Beleginfo - Inhalt 5",           #30
+    "Beleginfo - Art 6",              #31
+    "Beleginfo - Inhalt 6",           #32
+    "Beleginfo - Art 7",              #33
+    "Beleginfo - Inhalt 7",           #34
+    "Beleginfo - Art 8",              #35
+    "Beleginfo - Inhalt 8",           #36
+    "KOST1 - Kostenstelle",           #37
+    "KOST2 - Kostenstelle",           #38
+    "Kost-Menge",                     #39
+    "EU-Land u. UStID",               #40
+    "EU-Steuersatz",                  #41
+    "Abw. Versteuerungsart",          #42
+    "Sachverhalt L+L",                #43
+    "Funktionsergänzung L+L",         #44
+    "BU 49 Hauptfunktionstyp",        #45
+    "BU 49 Hauptfunktionsnummer",     #46
+    "BU 49 Funktionsergänzung",       #47
+    "Zusatzinformation - Art 1",      #48
+    "Zusatzinformation- Inhalt 1",    #49
+    "Zusatzinformation - Art 2",      #50
+    "Zusatzinformation- Inhalt 2",    #51
+    "Zusatzinformation - Art 3",      #52
+    "Zusatzinformation- Inhalt 3",    #53
+    "Zusatzinformation - Art 4",      #54
+    "Zusatzinformation- Inhalt 4",    #55
+    "Zusatzinformation - Art 5",      #56
+    "Zusatzinformation- Inhalt 5",    #57
+    "Zusatzinformation - Art 6",      #58
+    "Zusatzinformation- Inhalt 6",    #59
+    "Zusatzinformation - Art 7",      #60
+    "Zusatzinformation- Inhalt 7",    #61
+    "Zusatzinformation - Art 8",      #62
+    "Zusatzinformation- Inhalt 8",    #63
+    "Zusatzinformation - Art 9",      #64
+    "Zusatzinformation- Inhalt 9",    #65
+    "Zusatzinformation - Art 10",     #66
+    "Zusatzinformation- Inhalt 10",   #67
+    "Zusatzinformation - Art 11",     #68
+    "Zusatzinformation- Inhalt 11",   #69
+    "Zusatzinformation - Art 12",     #70
+    "Zusatzinformation- Inhalt 12",   #71
+    "Zusatzinformation - Art 13",     #72
+    "Zusatzinformation- Inhalt 13",   #73
+    "Zusatzinformation - Art 14",     #74
+    "Zusatzinformation- Inhalt 14",   #75
+    "Zusatzinformation - Art 15",     #76
+    "Zusatzinformation- Inhalt 15",   #77
+    "Zusatzinformation - Art 16",     #78
+    "Zusatzinformation- Inhalt 16",   #79
+    "Zusatzinformation - Art 17",     #80
+    "Zusatzinformation- Inhalt 17",   #81
+    "Zusatzinformation - Art 18",     #82
+    "Zusatzinformation- Inhalt 18",   #83
+    "Zusatzinformation - Art 19",     #84
+    "Zusatzinformation- Inhalt 19",   #85
+    "Zusatzinformation - Art 20",     #86
+    "Zusatzinformation- Inhalt 20",   #87
+    "Stück",                          #88
+    "Gewicht",                        #89
+    "Zahlweise",                      #90
+    "Forderungsart",                  #91
+    "Veranlagungsjahr",               #92
+    "Zugeordnete Falligkeit",         #93
+    "Skontotyp",                      #94
+    "Auftragsnummer",                 #95
+    "Buchungstyp",                    #96
+    "USt-Schlüssel (Anzahlungen)",    #97
+    "EU-Land (Anzahlungen)",          #98
+    "Sachverhalt L+L (Anzahlungen)",  #99
+    "EU-Steuersatz (Anzahlungen)",    #100
+    "Erlöskonto (Anzahlungen)",       #101
+    "Herkunft-Kz",                    #102
+    "Buchungs GUID",                  #103
+    "KOST-Datum",                     #104
+    "SEPA-Mandatsreferenz",           #105
+    "Skontosperre",                   #106
+    "Gesellschaftername",             #107
+    "Beteiligtennummer",              #108
+    "Identifikationsnummer",          #109
+    "Zeichnernummer",                 #110
+    "Postensperre bis",               #111
+    "Bezeichnung SoBil-Sachverhalt",  #112
+    "Kennzeichen SoBil-Buchung",      #113
+    "Festschreibung",                 #114
+    "Leistungsdatum",                 #115
+    "Datum Zuord. Steuerperiode"      #116
+    ]
+
+#
+# Readable keys for mapping a semantics to a DATEV columns
+#
+datev_column_mapping = {
+    'umsatz'            : 1,
+    'soll_haben'        : 2,
+    'konto'             : 7,
+    'gegenkonto'        : 8,
+    'bu_schluessel'     : 9,
+    'belegdatum'        : 10,
+    'belegfeld_1'       : 11,
+    'belegfeld_2'       : 12,
+    'buchungstext'      : 14,
+    'sachverhalt'       : 18,
+    'beleginfo_art_1'   : 21,
+    'beleginfo_inhalt_1': 22,
+    'beleginfo_art_2'   : 23,
+    'beleginfo_inhalt_2': 24,
+    'beleginfo_art_3'   : 25,
+    'beleginfo_inhalt_3': 26,
+    'beleginfo_art_4'   : 27,
+    'beleginfo_inhalt_4': 28,
+    'beleginfo_art_5'   : 29,
+    'beleginfo_inhalt_5': 30,
+    'beleginfo_art_6'   : 31,
+    'beleginfo_inhalt_6': 32,
+    'beleginfo_art_7'   : 33,
+    'beleginfo_inhalt_7': 34,
+    'beleginfo_art_8'   : 35,
+    'beleginfo_inhalt_8': 36,
+    'eu_steuersatz'     : 41,
+    'stueck'            : 88,
+    'zahlweise'         : 90,
+    'auftragsnummer'    : 95,
+    'buchungstyp'       : 96,
+    'gesellschaftername': 107,
+    'leistungsdatum'    : 115
+}
+
+    
 #---------------------------------------------------------------------
 # Auxillary functions
 #---------------------------------------------------------------------
@@ -349,7 +514,12 @@ class DatevEntry:
     def get (self, database, key):
         return database.get ("payments", self._id, key)
 
-
+    #
+    # Convert entry into vector of DATEV rows
+    #
+    def toDatev (self):
+        pass
+    
 #---------------------------------------------------------------------
 # MAIN
 #---------------------------------------------------------------------
@@ -362,13 +532,14 @@ database = Database ()
 #
 # Parse command line arguments
 #
-if len (sys.argv) != 4:
-    sys.stderr.write ('Format: ' + sys.argv[0] + ' <backup zip file> <month (MM)> <year (YYYY)>')
+if len (sys.argv) != 5:
+    sys.stderr.write ('Format: ' + sys.argv[0] + ' <backup zip file> <month (MM)> <year (YYYY)> <output file>')
     sys.exit (1)
 
 filename = sys.argv[1]
 month    = int (sys.argv[2])
 year     = int (sys.argv[3])
+output   = sys.argv[4]
     
 #
 #
@@ -454,3 +625,12 @@ for id in database.range ("payments"):
                     counter_entry = copy.deepcopy (entry)
                     counter_entry.setupECCounterEntry ()
                     datev.append (counter_entry)
+
+#
+# Extract result as DATEV file
+#
+with open (output, 'w', newline='') as file:
+    writer = csv.writer (file, dialect='excel')
+
+    for entry in datev:
+        writer.writerow (entry.toDatev ())
