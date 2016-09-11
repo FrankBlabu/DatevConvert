@@ -357,12 +357,14 @@ class Invoice:
         date = database.get ('invoices', id, 'date')
         self._date  = datetime.datetime.strptime (date, '%Y-%m-%d') if date else None
         self._total = float (database.get ('invoices', id, 'total'))
+        self._open = self._total
 
         #
         # Collect parts of the invoice which must sum up to the total and
         # will be used to split the total into the different tax parts
         #
-        print ('Invoice: ' + str (id) + ' (' + self._number + ')')
+        if False:
+            print ('Invoice: ' + str (id) + ' (' + self._number + ')')
         
         self._list = []        
         self._list += self.sumContent (database, 'products', 'invoice_product', id)
@@ -380,7 +382,8 @@ class Invoice:
         for item in self._list:
             total += item['sum']
 
-        print ('  --> total (invoice): ' + str (self._total) + ', sum (parts): ' + str (total))
+        if False:
+            print ('  --> total (invoice): ' + str (self._total) + ', sum (parts): ' + str (total))
 
         assert (round (100 * self._total) == round (100 * total)) 
         
@@ -443,14 +446,48 @@ class Invoice:
     #
     # Apply payment to invoice and reduce the appropriate items
     #
+    # @param database   Database we are working with
+    # @param payment_id Id of the payment to process
+    # @return List of the partial payments as (domain, tax, sum) dictionary
+    #
     def applyPayment (self, database, payment_id):
+
+        parts = []
 
         #
         # Subtract payment amount from invoice sum. Because the sum is split
         # up in (a) domains (services, products, medication, ) and (b) in
         # tax rates, the different lists have to be reduces one by one.
         #
-        sum = database.get ('payments', payment_id, 'amount')
+        sum = roundEuro (float (database.get ('payments', payment_id, 'amount')))
+        self._open = roundEuro (self._open - sum)
+
+        while sum > 0.0 and len (self._list) > 0:
+            entry = self._list[0]
+
+            #
+            # Case 1: Partial payment of an entry
+            #
+            if sum < entry['sum']:
+                entry['sum'] = roundEuro (entry['sum'] - sum)
+                
+                part = copy.deepcopy (entry)
+                part['sum'] = sum
+                parts.append (part)
+                
+                sum = 0.0
+
+            #
+            # Case 2: Entry fully paid
+            #
+            else:
+                sum = roundEuro (sum - entry['sum'])
+                parts.append (copy.deepcopy (entry))
+                self._list.pop (0)
+
+        assert (self._open >= 0.0)
+                
+        return parts
 
     
 #---------------------------------------------------------------------
@@ -618,7 +655,7 @@ year     = int (sys.argv[3])
 output   = sys.argv[4]
     
 #
-#
+# Read relevant CSV files from backup into database
 #
 with zipfile.ZipFile (filename) as zip:
     for entry in zip.namelist ():
@@ -650,18 +687,29 @@ with zipfile.ZipFile (filename) as zip:
 invoices = {}
 
 for invoice_id in database.range ('invoices'):
-    if database.get ('invoices', invoice_id, 'status') == 'complete':
+    if database.get ('invoices', invoice_id, 'status') == 'complete':        
         #
         # Generate complete invoice information
         #
         invoice = Invoice (database, invoice_id)
 
+        if False:
+            print ("Invoice #" + str (invoice_id) + " (" + invoice._number + "): " + str (invoice._open))
+        
         #
         # Reduce invoice by payments already performed in previous month
         #
         for payment_id in database.range ('payments'):
-            if database.get ('payments', payment_id, 'invoice_id') == invoice_id:
-                invoice.applyPayment (database, payment_id)
+            if not database.get ('payments', payment_id, 'deleted'):
+                payment_invoice_id = database.get ('payments', payment_id, 'invoice_id')
+                if payment_invoice_id and (int (payment_invoice_id) == invoice_id):
+                    date = stringToDate (database.get ('payments', payment_id, 'date'))
+                
+                    if date.year <= year and date.month < month:
+                        invoice.applyPayment (database, payment_id)
+
+        if False:
+            print ("  --> " + str (invoice._open))
         
         invoices[invoice_id] = invoice
 
