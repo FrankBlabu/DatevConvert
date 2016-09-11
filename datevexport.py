@@ -8,6 +8,7 @@ import copy
 import csv
 import datetime
 import io
+import locale
 import sys
 import zipfile
 
@@ -25,6 +26,16 @@ class Accounts:
     EC       = 1361
     Transfer = 1362
 
+    Services_19            = 8004
+    Services_7             = 8004
+    Medications_Applied_19 = 8014
+    Medications_Applied_7  = 8011
+    Medications_Sold_19    = 8024
+    Medications_Sold_7     = 8021
+    Products_19            = 8034
+    Products_7             = 8031
+
+    
 #
 # DATEV table column headers
 #
@@ -250,7 +261,7 @@ class FileDatabase:
                     else:
                         line[key] = ''
 
-                assert (id != None)
+                assert id != None
                 self._data[id] = line
 
     #
@@ -269,12 +280,12 @@ class FileDatabase:
     # @param key Key of the column to access
     #
     def get (self, id, key):
-        assert (id in self._data)
+        assert id in self._data
 
         data = self._data[id]
         
-        assert (isinstance (data, dict))
-        assert (key in data)
+        assert isinstance (data, dict)
+        assert key in data
 
         return data[key]
 
@@ -304,7 +315,7 @@ class Database:
     # @param key      Key of the column to access
     #
     def get (self, database, id, key):
-        assert (database in self._data)
+        assert database in self._data
         return self._data[database].get (id, key)
         
     #
@@ -313,14 +324,14 @@ class Database:
     # @param key Key to check 
     #
     def has (self, database, key):
-        assert (database in self._data)
+        assert database in self._data
         return self._data[database].has (key)
     
     #
     # Return range of ids present in the file database
     #
     def range (self, database):
-        assert (database in self._data)
+        assert database in self._data
         return self._data[database].range ()
     
     #
@@ -350,12 +361,8 @@ class Invoice:
         #
         # Gather some information about the invoice itself
         #
-        self._id        = id
-        self._client_id = database.get ('invoices', id, 'client_id')
-        self._number    = database.get ('invoices', id, 'number')
+        self._id = id
 
-        date = database.get ('invoices', id, 'date')
-        self._date  = datetime.datetime.strptime (date, '%Y-%m-%d') if date else None
         self._total = float (database.get ('invoices', id, 'total'))
         self._open = self._total
 
@@ -365,28 +372,52 @@ class Invoice:
         #
         if False:
             print ('Invoice: ' + str (id) + ' (' + self._number + ')')
-        
-        self._list = []        
-        self._list += self.sumContent (database, 'products', 'invoice_product', id)
-        self._list += self.sumContent (database, 'medication', 'invoice_medication', id)
-        self._list += self.sumContent (database, 'services', 'invoice_service', id)
+
+        self._debt = []        
+        self._debt += self.sumContent (database, 'products', 'invoice_product', id)
+        self._debt += self.sumContent (database, 'medication', 'invoice_medication', id)
+        self._debt += self.sumContent (database, 'services', 'invoice_service', id)
 
         #
         # IMPORTANT OPTIMIZATION: Lower tax items are processed FIRST because if
         # a customer does only pay a part of an invoice, we will have to pay
         # less taxes at least.
         #
-        self._list.sort (key=lambda entry: float (database.get ('tax', int (entry['tax']), 'tax')))
+        self._debt.sort (key=lambda entry: float (database.get ('tax', int (entry['tax']), 'tax')))
 
         total = 0.0
-        for item in self._list:
+        for item in self._debt:
             total += item['sum']
 
         if False:
             print ('  --> total (invoice): ' + str (self._total) + ', sum (parts): ' + str (total))
 
-        assert (round (100 * self._total) == round (100 * total)) 
+        assert round (100 * self._total) == round (100 * total)
+
+    #
+    # Return tax account matching the invoice part configuration
+    #
+    @staticmethod
+    def computeTaxAccount (database, domain, tax_id):
+
+        account = 0
+        tax = float (database.get ('tax', int (tax_id), 'tax'))
         
+        #
+        # Hard coced assertion necessary here to map the tax ids to account numbers
+        #
+        assert tax == 19.0 or tax == 7.0
+            
+        if domain == 'products':
+            account = Accounts.Products_19 if tax == 19.0 else Accounts.Products_7
+        elif domain == 'medication':
+            account = Accounts.Medications_Applied_19 if tax == 19.0 else Accounts.Medications_Applied_7
+        elif domain == 'services':
+            account = Accounts.Services_19 if tax == 19.0 else Accounts.Services_7
+        else:
+            raise "Unknown domain '{}'".format (domain)
+
+        return account
 
     #
     # Sum content of a database file belonging to a given invoice id
@@ -436,10 +467,11 @@ class Invoice:
 
         result = []
                     
-        for key in total.keys ():
-            result.append ({'domain': domain,
-                            'tax':    key,
-                            'sum':    total[key]});
+        for tax_id in total.keys ():
+            result.append ({'domain' : domain,
+                            'tax'    : tax_id,
+                            'account': Invoice.computeTaxAccount (database, domain, tax_id),
+                            'sum'    : total[tax_id]});
                     
         return result
 
@@ -462,8 +494,8 @@ class Invoice:
         sum = roundEuro (float (database.get ('payments', payment_id, 'amount')))
         self._open = roundEuro (self._open - sum)
 
-        while sum > 0.0 and len (self._list) > 0:
-            entry = self._list[0]
+        while sum > 0.0 and len (self._debt) > 0:
+            entry = self._debt[0]
 
             #
             # Case 1: Partial payment of an entry
@@ -483,9 +515,9 @@ class Invoice:
             else:
                 sum = roundEuro (sum - entry['sum'])
                 parts.append (copy.deepcopy (entry))
-                self._list.pop (0)
+                self._debt.pop (0)
 
-        assert (self._open >= 0.0)
+        assert self._open >= 0.0
                 
         return parts
 
@@ -547,14 +579,25 @@ class DatevEntry:
     #
     # Setup invoice based payment
     #
-    def setupInvoiceEntry (self, database):
-        pass
-            
+    # @param invoice_id    Id of the invoice the payment belongs to
+    # @param configuration Payment configuration as (domain, tax, sum) dictionary
+    #
+    def setupInvoiceEntry (self, database, invoice_id, configuration):
+        self._invoice_id = database.get ('invoices', invoice_id, 'number')
+        self._invoice_date = database.get ('invoices', invoice_id, 'date')
+        self._customer_id = database.get ('invoices', invoice_id, 'client_id')
+
+        self._item_tax = database.get ('tax', int (configuration['tax']), 'tax')
+        self._item_kind = configuration['domain']
+        self._amount = configuration['sum']
+        
+        self._payment_type = "Umsatz"
+        
     #
     # Setup non invoice payment
     #
-    def setupNonInvoiceEntry (self, database):
-        if (self.get (database, 'paymenttype').lower ().startswith ('geld auf bank')):
+    def setupNonInvoiceEntry (self):
+        if self._item_kind.lower ().startswith ('geld auf bank'):
             self._account      = Accounts.Bank
             self._payment_type = 'Einzahlung'
         else:
@@ -570,7 +613,6 @@ class DatevEntry:
         self._account      = Accounts.EC
         self._payment_type = 'Umbuchung'
         self._remarks      = 'Übertrag EC-Karten-Zahlung'
-        pass
 
     #
     # Query database for payment entry
@@ -583,7 +625,7 @@ class DatevEntry:
     #
     @staticmethod
     def getColumn (id):
-        assert (id in datev_column_mapping)
+        assert id in datev_column_mapping
         return datev_column_mapping[id] - 1
     
     #
@@ -594,7 +636,7 @@ class DatevEntry:
     def toDatev (self):
         row = [''] * len (datev_columns)
 
-        row[self.getColumn ('umsatz')]        = abs (self._amount)
+        row[self.getColumn ('umsatz')]        = locale.format ("%.2f", abs (self._amount))
         row[self.getColumn ('soll_haben')]    = 'S' if self._amount < 0 else 'H'
         row[self.getColumn ('konto')]         = self._account
         row[self.getColumn ('gegenkonto')]    = Accounts.Transfer if self._payment_kind == 'bill' else Accounts.Main
@@ -636,6 +678,11 @@ class DatevEntry:
 #---------------------------------------------------------------------
 # MAIN
 #---------------------------------------------------------------------
+
+#
+# Configuration
+#
+locale.setlocale (locale.LC_ALL, "German")
 
 #
 # Database instance containg everything which was read
@@ -719,8 +766,8 @@ for invoice_id in database.range ('invoices'):
 #
 datev = []
 
-for id in database.range ('payments'):
-    date = stringToDate (database.get ('payments', id, 'date'))
+for payment_id in database.range ('payments'):
+    date = stringToDate (database.get ('payments', payment_id, 'date'))
 
     #
     # Given month only
@@ -730,44 +777,56 @@ for id in database.range ('payments'):
         #
         # Accountants tax application cannot process payments with 0€ amount
         #
-        if roundEuro (float (database.get ('payments', id, 'amount'))) != 0:
+        if roundEuro (float (database.get ('payments', payment_id, 'amount'))) != 0:
 
             #
             # Skip cancelled payments
             #
-            if not database.get ('payments', id, 'deleted'):
+            if not database.get ('payments', payment_id, 'deleted'):
 
                 #
-                # Setup general DATEV entry will all common fields initialized
+                # Setup general DATEV entry with all common fields initialized
                 #
-                entry = DatevEntry (database, id)
 
                 #
                 # Case 1: Invoice based payment
                 #
-                if database.get ('payments', id, 'invoice_id'):
-                    pass
+                if database.get ('payments', payment_id, 'invoice_id'):
+                    invoice_id = int (database.get ('payments', payment_id, 'invoice_id'))
+                    assert invoice_id in invoices
+
+                    parts = invoices[invoice_id].applyPayment (database, payment_id)
+                    for part in parts:
+                        entry = DatevEntry (database, payment_id)
+                        entry.setupInvoiceEntry (database, invoice_id, part)
+                        datev.append (entry)
 
                 #
                 # Case 2: Non invoice based payment
                 #
                 else:
-                    entry.setupNonInvoiceEntry (database);
+                    entry = DatevEntry (database, payment_id)
+                    entry.setupNonInvoiceEntry ();
                     datev.append (entry)
 
                 #
-                # In case of EC card payments, setup counter entry
+                # In case of EC card payments, setup additional counter entry
                 #
-                if entry._payment_kind == 'ec':
-                    counter_entry = copy.deepcopy (entry)
-                    counter_entry.setupECCounterEntry ()
-                    datev.append (counter_entry)
+                if database.get ('payments', payment_id, 'method') == 'ec':
+                    entry = DatevEntry (database, payment_id)
+                    entry.setupECCounterEntry ()
+                    datev.append (entry)
 
 #
 # Extract result as DATEV file
 #
+csv.register_dialect ('datev',
+                      delimiter=';',
+                      quoting=csv.QUOTE_ALL,
+                      quotechar='"')
+
 with open (output, 'w', newline='') as file:
-    writer = csv.writer (file, dialect='excel')
+    writer = csv.writer (file, dialect='datev')
 
     writer.writerow (datev_columns)
     
