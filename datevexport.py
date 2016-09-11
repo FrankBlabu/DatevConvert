@@ -376,8 +376,8 @@ class Invoice:
 
         self._debt = []        
         self._debt += self.sumContent (database, 'products',           'invoice_product',    id, {})
-        self._debt += self.sumContent (database, 'medication',         'invoice_medication', id, {'applied': 0})
-        self._debt += self.sumContent (database, 'medication_applied', 'invoice_medication', id, {'applied': 1})
+        self._debt += self.sumContent (database, 'medication',         'invoice_medication', id, {'applied': '0'})
+        self._debt += self.sumContent (database, 'medication_applied', 'invoice_medication', id, {'applied': '1'})
         self._debt += self.sumContent (database, 'services',           'invoice_service',    id, {})
 
         #
@@ -426,51 +426,65 @@ class Invoice:
     #
     # Sum content of a database file belonging to a given invoice id
     #
-    # @param database   Database we are working with
-    # @param domain     Item domain (product, service, medication, ...)
-    # @param file       Database file containing the detailed items
-    # @param invoice_id Id of the invoice processed
-    # @param condition  Additional conditions for the invoice data set to be
-    #                   valid for this case
+    # @param database    Database we are working with
+    # @param domain      Item domain (product, service, medication, ...)
+    # @param file        Database file containing the detailed items
+    # @param invoice_id  Id of the invoice processed
+    # @param conditions  Additional conditions for the invoice data set to be
+    #                    valid for this case
     # @return List of invoice parts containig of (domain, tax, sum) maps
     #
     @staticmethod
-    def sumContent (database, domain, file, invoice_id, condition):
+    def sumContent (database, domain, file, invoice_id, conditions):
 
         total = {}
 
+        #
+        # Iterate over invoice detail entries and process matching entries
+        #
         for id in database.range (file):
             if database.get (file, id, 'invoice_id') == invoice_id:
 
-                amount = 1.0
-                if database.has (file, 'amount'):
-                    amount = float (database.get (file, id, 'amount'))
+                #
+                # If additional conditions have been specified, these have
+                # to match the dataset, too
+                #
+                matches = True
 
-                factor = 1.0
-                if database.has (file, 'factor'):
-                    factor = float (database.get (file, id, 'factor'))
+                for key in conditions:
+                    if database.get (file, id, key) != conditions[key]:
+                        matches = False
 
-                count = 1.0
-                if database.has (file, 'count'):
-                    count = float (database.get (file, id, 'count'))
+                if matches:
+                    amount = 1.0
+                    if database.has (file, 'amount'):
+                        amount = float (database.get (file, id, 'amount'))
 
-                tax_id = database.get (file, id, 'tax_id')
-                    
-                price = float (database.get (file, id, 'price'))
+                    factor = 1.0
+                    if database.has (file, 'factor'):
+                        factor = float (database.get (file, id, 'factor'))
 
-                if not tax_id in total:
-                    total[tax_id] = 0.0
+                    count = 1.0
+                    if database.has (file, 'count'):
+                        count = float (database.get (file, id, 'count'))
+
+                    tax_id = database.get (file, id, 'tax_id')
                 
-                total[tax_id] += roundEuro (amount * factor * count * price)
+                    price = float (database.get (file, id, 'price'))
 
-                if False:
-                    print ('  ' + file + ', ' + str (amount) +
-                           ' * ' + str (factor) +
-                           ' * ' + str (count) +
-                           ' * ' + str (price) +
-                           ' = ' + str (roundEuro (amount * factor * count * price)) +
-                           ' (' + str (amount * factor * count * price) + ')')
+                    if not tax_id in total:
+                        total[tax_id] = 0.0
+                    
+                    total[tax_id] += roundEuro (amount * factor * count * price)
 
+                    if False:
+                        print ('  ' + file + ', ' + str (amount) +
+                               ' * ' + str (factor) +
+                               ' * ' + str (count) +
+                               ' * ' + str (price) +
+                               ' = ' + str (roundEuro (amount * factor * count * price)) +
+                               ' (' + str (amount * factor * count * price) + ')')
+                        
         result = []
                     
         for tax_id in total.keys ():
