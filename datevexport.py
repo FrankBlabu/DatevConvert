@@ -29,122 +29,122 @@ class Accounts:
 # DATEV table column headers
 #
 datev_columns = [
-    "Umsatz (ohne Soll/Haben-Kz)",    #1
-    "Soll/Haben-Kennzeichen",         #2
-    "WKZ Umsatz",                     #3
-    "Kurs",                           #4
-    "Basis-Umsatz",                   #5
-    "WKZ Basis-Umsatz",               #6
-    "Konto",                          #7
-    "Gegenkonto (ohne BU-Schlüssel)", #8
-    "BU-Schlüssel",                   #9
-    "Belegdatum",                     #10
-    "Belegfeld 1",                    #11
-    "Belegfeld 2",                    #12
-    "Skonto",                         #13
-    "Buchungstext",                   #14
-    "Postensperre",                   #15
-    "Diverse Adressnummer",           #16
-    "Geschäftspartnerbank",           #17
-    "Sachverhalt",                    #18
-    "Zinssperre",                     #19
-    "Beleglink",                      #20
-    "Beleginfo - Art 1",              #21
-    "Beleginfo - Inhalt 1",           #22
-    "Beleginfo - Art 2",              #23
-    "Beleginfo - Inhalt 2",           #24
-    "Beleginfo - Art 3",              #25
-    "Beleginfo - Inhalt 3",           #26
-    "Beleginfo - Art 4",              #27
-    "Beleginfo - Inhalt 4",           #28
-    "Beleginfo - Art 5",              #29
-    "Beleginfo - Inhalt 5",           #30
-    "Beleginfo - Art 6",              #31
-    "Beleginfo - Inhalt 6",           #32
-    "Beleginfo - Art 7",              #33
-    "Beleginfo - Inhalt 7",           #34
-    "Beleginfo - Art 8",              #35
-    "Beleginfo - Inhalt 8",           #36
-    "KOST1 - Kostenstelle",           #37
-    "KOST2 - Kostenstelle",           #38
-    "Kost-Menge",                     #39
-    "EU-Land u. UStID",               #40
-    "EU-Steuersatz",                  #41
-    "Abw. Versteuerungsart",          #42
-    "Sachverhalt L+L",                #43
-    "Funktionsergänzung L+L",         #44
-    "BU 49 Hauptfunktionstyp",        #45
-    "BU 49 Hauptfunktionsnummer",     #46
-    "BU 49 Funktionsergänzung",       #47
-    "Zusatzinformation - Art 1",      #48
-    "Zusatzinformation- Inhalt 1",    #49
-    "Zusatzinformation - Art 2",      #50
-    "Zusatzinformation- Inhalt 2",    #51
-    "Zusatzinformation - Art 3",      #52
-    "Zusatzinformation- Inhalt 3",    #53
-    "Zusatzinformation - Art 4",      #54
-    "Zusatzinformation- Inhalt 4",    #55
-    "Zusatzinformation - Art 5",      #56
-    "Zusatzinformation- Inhalt 5",    #57
-    "Zusatzinformation - Art 6",      #58
-    "Zusatzinformation- Inhalt 6",    #59
-    "Zusatzinformation - Art 7",      #60
-    "Zusatzinformation- Inhalt 7",    #61
-    "Zusatzinformation - Art 8",      #62
-    "Zusatzinformation- Inhalt 8",    #63
-    "Zusatzinformation - Art 9",      #64
-    "Zusatzinformation- Inhalt 9",    #65
-    "Zusatzinformation - Art 10",     #66
-    "Zusatzinformation- Inhalt 10",   #67
-    "Zusatzinformation - Art 11",     #68
-    "Zusatzinformation- Inhalt 11",   #69
-    "Zusatzinformation - Art 12",     #70
-    "Zusatzinformation- Inhalt 12",   #71
-    "Zusatzinformation - Art 13",     #72
-    "Zusatzinformation- Inhalt 13",   #73
-    "Zusatzinformation - Art 14",     #74
-    "Zusatzinformation- Inhalt 14",   #75
-    "Zusatzinformation - Art 15",     #76
-    "Zusatzinformation- Inhalt 15",   #77
-    "Zusatzinformation - Art 16",     #78
-    "Zusatzinformation- Inhalt 16",   #79
-    "Zusatzinformation - Art 17",     #80
-    "Zusatzinformation- Inhalt 17",   #81
-    "Zusatzinformation - Art 18",     #82
-    "Zusatzinformation- Inhalt 18",   #83
-    "Zusatzinformation - Art 19",     #84
-    "Zusatzinformation- Inhalt 19",   #85
-    "Zusatzinformation - Art 20",     #86
-    "Zusatzinformation- Inhalt 20",   #87
-    "Stück",                          #88
-    "Gewicht",                        #89
-    "Zahlweise",                      #90
-    "Forderungsart",                  #91
-    "Veranlagungsjahr",               #92
-    "Zugeordnete Falligkeit",         #93
-    "Skontotyp",                      #94
-    "Auftragsnummer",                 #95
-    "Buchungstyp",                    #96
-    "USt-Schlüssel (Anzahlungen)",    #97
-    "EU-Land (Anzahlungen)",          #98
-    "Sachverhalt L+L (Anzahlungen)",  #99
-    "EU-Steuersatz (Anzahlungen)",    #100
-    "Erlöskonto (Anzahlungen)",       #101
-    "Herkunft-Kz",                    #102
-    "Buchungs GUID",                  #103
-    "KOST-Datum",                     #104
-    "SEPA-Mandatsreferenz",           #105
-    "Skontosperre",                   #106
-    "Gesellschaftername",             #107
-    "Beteiligtennummer",              #108
-    "Identifikationsnummer",          #109
-    "Zeichnernummer",                 #110
-    "Postensperre bis",               #111
-    "Bezeichnung SoBil-Sachverhalt",  #112
-    "Kennzeichen SoBil-Buchung",      #113
-    "Festschreibung",                 #114
-    "Leistungsdatum",                 #115
-    "Datum Zuord. Steuerperiode"      #116
+    'Umsatz (ohne Soll/Haben-Kz)',    #1
+    'Soll/Haben-Kennzeichen',         #2
+    'WKZ Umsatz',                     #3
+    'Kurs',                           #4
+    'Basis-Umsatz',                   #5
+    'WKZ Basis-Umsatz',               #6
+    'Konto',                          #7
+    'Gegenkonto (ohne BU-Schlüssel)', #8
+    'BU-Schlüssel',                   #9
+    'Belegdatum',                     #10
+    'Belegfeld 1',                    #11
+    'Belegfeld 2',                    #12
+    'Skonto',                         #13
+    'Buchungstext',                   #14
+    'Postensperre',                   #15
+    'Diverse Adressnummer',           #16
+    'Geschäftspartnerbank',           #17
+    'Sachverhalt',                    #18
+    'Zinssperre',                     #19
+    'Beleglink',                      #20
+    'Beleginfo - Art 1',              #21
+    'Beleginfo - Inhalt 1',           #22
+    'Beleginfo - Art 2',              #23
+    'Beleginfo - Inhalt 2',           #24
+    'Beleginfo - Art 3',              #25
+    'Beleginfo - Inhalt 3',           #26
+    'Beleginfo - Art 4',              #27
+    'Beleginfo - Inhalt 4',           #28
+    'Beleginfo - Art 5',              #29
+    'Beleginfo - Inhalt 5',           #30
+    'Beleginfo - Art 6',              #31
+    'Beleginfo - Inhalt 6',           #32
+    'Beleginfo - Art 7',              #33
+    'Beleginfo - Inhalt 7',           #34
+    'Beleginfo - Art 8',              #35
+    'Beleginfo - Inhalt 8',           #36
+    'KOST1 - Kostenstelle',           #37
+    'KOST2 - Kostenstelle',           #38
+    'Kost-Menge',                     #39
+    'EU-Land u. UStID',               #40
+    'EU-Steuersatz',                  #41
+    'Abw. Versteuerungsart',          #42
+    'Sachverhalt L+L',                #43
+    'Funktionsergänzung L+L',         #44
+    'BU 49 Hauptfunktionstyp',        #45
+    'BU 49 Hauptfunktionsnummer',     #46
+    'BU 49 Funktionsergänzung',       #47
+    'Zusatzinformation - Art 1',      #48
+    'Zusatzinformation- Inhalt 1',    #49
+    'Zusatzinformation - Art 2',      #50
+    'Zusatzinformation- Inhalt 2',    #51
+    'Zusatzinformation - Art 3',      #52
+    'Zusatzinformation- Inhalt 3',    #53
+    'Zusatzinformation - Art 4',      #54
+    'Zusatzinformation- Inhalt 4',    #55
+    'Zusatzinformation - Art 5',      #56
+    'Zusatzinformation- Inhalt 5',    #57
+    'Zusatzinformation - Art 6',      #58
+    'Zusatzinformation- Inhalt 6',    #59
+    'Zusatzinformation - Art 7',      #60
+    'Zusatzinformation- Inhalt 7',    #61
+    'Zusatzinformation - Art 8',      #62
+    'Zusatzinformation- Inhalt 8',    #63
+    'Zusatzinformation - Art 9',      #64
+    'Zusatzinformation- Inhalt 9',    #65
+    'Zusatzinformation - Art 10',     #66
+    'Zusatzinformation- Inhalt 10',   #67
+    'Zusatzinformation - Art 11',     #68
+    'Zusatzinformation- Inhalt 11',   #69
+    'Zusatzinformation - Art 12',     #70
+    'Zusatzinformation- Inhalt 12',   #71
+    'Zusatzinformation - Art 13',     #72
+    'Zusatzinformation- Inhalt 13',   #73
+    'Zusatzinformation - Art 14',     #74
+    'Zusatzinformation- Inhalt 14',   #75
+    'Zusatzinformation - Art 15',     #76
+    'Zusatzinformation- Inhalt 15',   #77
+    'Zusatzinformation - Art 16',     #78
+    'Zusatzinformation- Inhalt 16',   #79
+    'Zusatzinformation - Art 17',     #80
+    'Zusatzinformation- Inhalt 17',   #81
+    'Zusatzinformation - Art 18',     #82
+    'Zusatzinformation- Inhalt 18',   #83
+    'Zusatzinformation - Art 19',     #84
+    'Zusatzinformation- Inhalt 19',   #85
+    'Zusatzinformation - Art 20',     #86
+    'Zusatzinformation- Inhalt 20',   #87
+    'Stück',                          #88
+    'Gewicht',                        #89
+    'Zahlweise',                      #90
+    'Forderungsart',                  #91
+    'Veranlagungsjahr',               #92
+    'Zugeordnete Falligkeit',         #93
+    'Skontotyp',                      #94
+    'Auftragsnummer',                 #95
+    'Buchungstyp',                    #96
+    'USt-Schlüssel (Anzahlungen)',    #97
+    'EU-Land (Anzahlungen)',          #98
+    'Sachverhalt L+L (Anzahlungen)',  #99
+    'EU-Steuersatz (Anzahlungen)',    #100
+    'Erlöskonto (Anzahlungen)',       #101
+    'Herkunft-Kz',                    #102
+    'Buchungs GUID',                  #103
+    'KOST-Datum',                     #104
+    'SEPA-Mandatsreferenz',           #105
+    'Skontosperre',                   #106
+    'Gesellschaftername',             #107
+    'Beteiligtennummer',              #108
+    'Identifikationsnummer',          #109
+    'Zeichnernummer',                 #110
+    'Postensperre bis',               #111
+    'Bezeichnung SoBil-Sachverhalt',  #112
+    'Kennzeichen SoBil-Buchung',      #113
+    'Festschreibung',                 #114
+    'Leistungsdatum',                 #115
+    'Datum Zuord. Steuerperiode'      #116
     ]
 
 #
@@ -201,7 +201,7 @@ def roundEuro (n):
 # Convert date string representation into Python date class
 #
 def stringToDate (text):
-    return  datetime.datetime.strptime (text, "%Y-%m-%d %H:%M:%S")
+    return  datetime.datetime.strptime (text, '%Y-%m-%d %H:%M:%S')
 
 
 #---------------------------------------------------------------------
@@ -248,7 +248,7 @@ class FileDatabase:
                     if (row[i] != 'NULL'):
                         line[key] = row[i]
                     else:
-                        line[key] = ""
+                        line[key] = ''
 
                 assert (id != None)
                 self._data[id] = line
@@ -351,36 +351,36 @@ class Invoice:
         # Gather some information about the invoice itself
         #
         self._id        = id
-        self._client_id = database.get ("invoices", id, "client_id")
-        self._number    = database.get ("invoices", id, "number")
+        self._client_id = database.get ('invoices', id, 'client_id')
+        self._number    = database.get ('invoices', id, 'number')
 
-        date = database.get ("invoices", id, "date")
+        date = database.get ('invoices', id, 'date')
         self._date  = datetime.datetime.strptime (date, '%Y-%m-%d') if date else None
-        self._total = float (database.get ("invoices", id, "total"))
+        self._total = float (database.get ('invoices', id, 'total'))
 
         #
         # Collect parts of the invoice which must sum up to the total and
         # will be used to split the total into the different tax parts
         #
-        print ("Invoice: " + str (id) + " (" + self._number + ")")
+        print ('Invoice: ' + str (id) + ' (' + self._number + ')')
         
         self._list = []        
-        self._list += self.sum_content (database, "products", "invoice_product", id)
-        self._list += self.sum_content (database, "medication", "invoice_medication", id)
-        self._list += self.sum_content (database, "services", "invoice_service", id)
+        self._list += self.sumContent (database, 'products', 'invoice_product', id)
+        self._list += self.sumContent (database, 'medication', 'invoice_medication', id)
+        self._list += self.sumContent (database, 'services', 'invoice_service', id)
 
         #
         # IMPORTANT OPTIMIZATION: Lower tax items are processed FIRST because if
-        # a customer does only pay a part of his invoice, we will have to pay
+        # a customer does only pay a part of an invoice, we will have to pay
         # less taxes at least.
         #
-        self._list.sort (key=lambda entry: float (database.get ("tax", int (entry['tax']), 'tax')))
+        self._list.sort (key=lambda entry: float (database.get ('tax', int (entry['tax']), 'tax')))
 
         total = 0.0
         for item in self._list:
             total += item['sum']
 
-        print ("  --> total (invoice): " + str (self._total) + ", sum (parts): " + str (total))
+        print ('  --> total (invoice): ' + str (self._total) + ', sum (parts): ' + str (total))
 
         assert (round (100 * self._total) == round (100 * total)) 
         
@@ -394,28 +394,29 @@ class Invoice:
     # @param invoice_id Id of the invoice processed
     # @return List of invoice parts containig of (domain, tax, sum) maps
     #
-    def sum_content (self, database, domain, file, invoice_id):
+    @staticmethod
+    def sumContent (self, database, domain, file, invoice_id):
 
         total = {}
 
         for id in database.range (file):
-            if int (database.get (file, id, "invoice_id")) == invoice_id:
+            if int (database.get (file, id, 'invoice_id')) == invoice_id:
 
                 amount = 1.0
-                if database.has (file, "amount"):
-                    amount = float (database.get (file, id, "amount"))
+                if database.has (file, 'amount'):
+                    amount = float (database.get (file, id, 'amount'))
 
                 factor = 1.0
-                if database.has (file, "factor"):
-                    factor = float (database.get (file, id, "factor"))
+                if database.has (file, 'factor'):
+                    factor = float (database.get (file, id, 'factor'))
 
                 count = 1.0
-                if database.has (file, "count"):
-                    count = float (database.get (file, id, "count"))
+                if database.has (file, 'count'):
+                    count = float (database.get (file, id, 'count'))
 
-                tax_id = database.get (file, id, "tax_id")
+                tax_id = database.get (file, id, 'tax_id')
                     
-                price = float (database.get (file, id, "price"))
+                price = float (database.get (file, id, 'price'))
 
                 if not tax_id in total:
                     total[tax_id] = 0.0
@@ -423,12 +424,12 @@ class Invoice:
                 total[tax_id] += roundEuro (amount * factor * count * price)
 
                 if False:
-                    print ("  " + file + ", " + str (amount) +
-                           " * " + str (factor) +
-                           " * " + str (count) +
-                           " * " + str (price) +
-                           " = " + str (roundEuro (amount * factor * count * price)) +
-                           " (" + str (amount * factor * count * price) + ")")
+                    print ('  ' + file + ', ' + str (amount) +
+                           ' * ' + str (factor) +
+                           ' * ' + str (count) +
+                           ' * ' + str (price) +
+                           ' = ' + str (roundEuro (amount * factor * count * price)) +
+                           ' (' + str (amount * factor * count * price) + ')')
 
         result = []
                     
@@ -447,10 +448,10 @@ class Invoice:
         #
         # Subtract payment amount from invoice sum. Because the sum is split
         # up in (a) domains (services, products, medication, ) and (b) in
-        # 7% and 19% tax, the different lists have to be reduces one by one.
+        # tax rates, the different lists have to be reduces one by one.
         #
-        
-        pass
+        sum = database.get ('payments', payment_id, 'amount')
+
     
 #---------------------------------------------------------------------
 # CLASS DatevEntry
@@ -490,21 +491,21 @@ class DatevEntry:
         # The payment type is not known yet. Setup common fields only.
         #
         self._id               = payment_id
-        self._invoice_id       = ""
-        self._invoice_date     = ""
+        self._invoice_id       = ''
+        self._invoice_date     = ''
         self._payment_id       = payment_id
-        self._payment_date     = stringToDate (self.get (database, "date"))
-        self._payment_kind     = self.get (database, "method")
-        self._item_kind        = self.get (database, "paymenttype")
+        self._payment_date     = stringToDate (self.get (database, 'date'))
+        self._payment_kind     = self.get (database, 'method')
+        self._item_kind        = self.get (database, 'paymenttype')
         self._item_date        = self._payment_date
-        self._item_description = self.get (database, "notes")
-        self._item_tax         = ""
-        self._customer_id      = ""
-        self._amount           = roundEuro (float (self.get (database, "amount")))
-        self._remarks          = ""
-        self._responsible      = self.get (database, "username")
+        self._item_description = self.get (database, 'notes')
+        self._item_tax         = ''
+        self._customer_id      = ''
+        self._amount           = roundEuro (float (self.get (database, 'amount')))
+        self._remarks          = ''
+        self._responsible      = self.get (database, 'username')
         self._account          = Accounts.Null
-        self._payment_type     = ""
+        self._payment_type     = ''
 
     #
     # Setup invoice based payment
@@ -516,12 +517,12 @@ class DatevEntry:
     # Setup non invoice payment
     #
     def setupNonInvoiceEntry (self, database):
-        if (self.get (database, "paymenttype").lower ().startswith ("geld auf bank")):
+        if (self.get (database, 'paymenttype').lower ().startswith ('geld auf bank')):
             self._account      = Accounts.Bank
-            self._payment_type = "Einzahlung"
+            self._payment_type = 'Einzahlung'
         else:
             self._account      = Accounts.Null
-            self._payment_type = "Barausgabe"
+            self._payment_type = 'Barausgabe'
 
 
     #
@@ -530,15 +531,15 @@ class DatevEntry:
     #
     def setupECCounterEntry (self):
         self._account      = Accounts.EC
-        self._payment_type = "Umbuchung"
-        self._remarks      = "Übertrag EC-Karten-Zahlung"
+        self._payment_type = 'Umbuchung'
+        self._remarks      = 'Übertrag EC-Karten-Zahlung'
         pass
 
     #
     # Query database for payment entry
     #
     def get (self, database, key):
-        return database.get ("payments", self._id, key)
+        return database.get ('payments', self._id, key)
 
     #
     # Get DATEV output vector column matching a column id
@@ -579,17 +580,17 @@ class DatevEntry:
         if self._invoice_id:
             row[self.getColumn ('buchungstext')]   = 'Rechnung ' + self._invoice_id
 
-        row[self.getColumn ('beleginfo_art_1')]    = "Rechnungsnummer"
+        row[self.getColumn ('beleginfo_art_1')]    = 'Rechnungsnummer'
         row[self.getColumn ('beleginfo_inhalt_1')] = self._invoice_id
-        row[self.getColumn ('beleginfo_art_1')]    = "Rechnungsdatum"
+        row[self.getColumn ('beleginfo_art_1')]    = 'Rechnungsdatum'
         row[self.getColumn ('beleginfo_inhalt_1')] = self._invoice_date
-        row[self.getColumn ('beleginfo_art_1')]    = "Vorgangsnummer"
+        row[self.getColumn ('beleginfo_art_1')]    = 'Vorgangsnummer'
         row[self.getColumn ('beleginfo_inhalt_1')] = self._payment_id
-        row[self.getColumn ('beleginfo_art_1')]    = "Typ"
+        row[self.getColumn ('beleginfo_art_1')]    = 'Typ'
         row[self.getColumn ('beleginfo_inhalt_1')] = self._item_kind
-        row[self.getColumn ('beleginfo_art_1')]    = "Kundennummer"
+        row[self.getColumn ('beleginfo_art_1')]    = 'Kundennummer'
         row[self.getColumn ('beleginfo_inhalt_1')] = self._customer_id
-        row[self.getColumn ('beleginfo_art_1')]    = "Bemerkungen"
+        row[self.getColumn ('beleginfo_art_1')]    = 'Bemerkungen'
         row[self.getColumn ('beleginfo_inhalt_1')] = self._remarks
 
         return row
@@ -621,35 +622,35 @@ output   = sys.argv[4]
 #
 with zipfile.ZipFile (filename) as zip:
     for entry in zip.namelist ():
-        if (entry.endswith ("clients.csv")):
+        if (entry.endswith ('clients.csv')):
             with zip.open (entry, 'rU') as file:
-                database.add (file, "clients")
-        elif (entry.endswith ("invoices.csv")):
+                database.add (file, 'clients')
+        elif (entry.endswith ('invoices.csv')):
             with zip.open (entry, 'rU') as file:
-                database.add (file, "invoices")
-        elif (entry.endswith ("invoice_medication.csv")):
+                database.add (file, 'invoices')
+        elif (entry.endswith ('invoice_medication.csv')):
             with zip.open (entry, 'rU') as file:
-                database.add (file, "invoice_medication")
-        elif (entry.endswith ("invoice_product.csv")):
+                database.add (file, 'invoice_medication')
+        elif (entry.endswith ('invoice_product.csv')):
             with zip.open (entry, 'rU') as file:
-                database.add (file, "invoice_product")
-        elif (entry.endswith ("invoice_service.csv")):
+                database.add (file, 'invoice_product')
+        elif (entry.endswith ('invoice_service.csv')):
             with zip.open (entry, 'rU') as file:
-                database.add (file, "invoice_service")
-        elif (entry.endswith ("payments.csv")):
+                database.add (file, 'invoice_service')
+        elif (entry.endswith ('payments.csv')):
             with zip.open (entry, 'rU') as file:
-                database.add (file, "payments")
-        elif (entry.endswith ("tax.csv")):
+                database.add (file, 'payments')
+        elif (entry.endswith ('tax.csv')):
             with zip.open (entry, 'rU') as file:
-                database.add (file, "tax")
+                database.add (file, 'tax')
 
 #
 # Generate invoice dictionary
 #
 invoices = {}
 
-for invoice_id in database.range ("invoices"):
-    if database.get ("invoices", invoice_id, "status") == "complete":
+for invoice_id in database.range ('invoices'):
+    if database.get ('invoices', invoice_id, 'status') == 'complete':
         #
         # Generate complete invoice information
         #
@@ -658,8 +659,8 @@ for invoice_id in database.range ("invoices"):
         #
         # Reduce invoice by payments already performed in previous month
         #
-        for payment_id in database.range ("payments"):
-            if database.get ("payments", payment_id, "invoice_id") == invoice_id:
+        for payment_id in database.range ('payments'):
+            if database.get ('payments', payment_id, 'invoice_id') == invoice_id:
                 invoice.applyPayment (database, payment_id)
         
         invoices[invoice_id] = invoice
@@ -670,8 +671,8 @@ for invoice_id in database.range ("invoices"):
 #
 datev = []
 
-for id in database.range ("payments"):
-    date = stringToDate (database.get ("payments", id, "date"))
+for id in database.range ('payments'):
+    date = stringToDate (database.get ('payments', id, 'date'))
 
     #
     # Given month only
@@ -681,12 +682,12 @@ for id in database.range ("payments"):
         #
         # Accountants tax application cannot process payments with 0€ amount
         #
-        if roundEuro (float (database.get ("payments", id, "amount"))) != 0:
+        if roundEuro (float (database.get ('payments', id, 'amount'))) != 0:
 
             #
             # Skip cancelled payments
             #
-            if not database.get ("payments", id, "deleted"):
+            if not database.get ('payments', id, 'deleted'):
 
                 #
                 # Setup general DATEV entry will all common fields initialized
@@ -696,7 +697,7 @@ for id in database.range ("payments"):
                 #
                 # Case 1: Invoice based payment
                 #
-                if database.get ("payments", id, "invoice_id"):
+                if database.get ('payments', id, 'invoice_id'):
                     pass
 
                 #
@@ -709,7 +710,7 @@ for id in database.range ("payments"):
                 #
                 # In case of EC card payments, setup counter entry
                 #
-                if entry._payment_kind == "ec":
+                if entry._payment_kind == 'ec':
                     counter_entry = copy.deepcopy (entry)
                     counter_entry.setupECCounterEntry ()
                     datev.append (counter_entry)
