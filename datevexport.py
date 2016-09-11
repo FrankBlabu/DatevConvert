@@ -362,20 +362,25 @@ class Invoice:
         # Collect parts of the invoice which must sum up to the total and
         # will be used to split the total into the different tax parts
         #
-        if False:
-            print ("Invoice: " + str (id) + " / " + self._number)
+        print ("Invoice: " + str (id) + " (" + self._number + ")")
         
-        self._total_products   = self.sum_content (database, "invoice_product", id)
-        self._total_medication = self.sum_content (database, "invoice_medication", id)
-        self._total_service    = self.sum_content (database, "invoice_service", id)
+        self._list = []        
+        self._list += self.sum_content (database, "products", "invoice_product", id)
+        self._list += self.sum_content (database, "medication", "invoice_medication", id)
+        self._list += self.sum_content (database, "services", "invoice_service", id)
 
-        total = sum (self._total_products.values ()) + \
-                sum (self._total_medication.values ()) + \
-                sum (self._total_service.values ())
+        #
+        # IMPORTANT OPTIMIZATION: Lower tax items are processed FIRST because if
+        # a customer does only pay a part of his invoice, we will have to pay
+        # less taxes at least.
+        #
+        self._list.sort (key=lambda entry: float (database.get ("tax", int (entry['tax']), 'tax')))
 
+        total = 0.0
+        for item in self._list:
+            total += item['sum']
 
-        if False:
-            print ("  --> total: " + str (self._total) + ", sum: " + str (total))
+        print ("  --> total (invoice): " + str (self._total) + ", sum (parts): " + str (total))
 
         assert (round (100 * self._total) == round (100 * total)) 
         
@@ -384,11 +389,12 @@ class Invoice:
     # Sum content of a database file belonging to a given invoice id
     #
     # @param database   Database we are working with
+    # @param domain     Item domain (product, service, medication, ...)
     # @param file       Database file containing the detailed items
     # @param invoice_id Id of the invoice processed
-    # @return Dictionary of sums with the tax ids as keys
+    # @return List of invoice parts containig of (domain, tax, sum) maps
     #
-    def sum_content (self, database, file, invoice_id):
+    def sum_content (self, database, domain, file, invoice_id):
 
         total = {}
 
@@ -424,8 +430,28 @@ class Invoice:
                            " = " + str (roundEuro (amount * factor * count * price)) +
                            " (" + str (amount * factor * count * price) + ")")
 
-        return total
-                
+        result = []
+                    
+        for key in total.keys ():
+            result.append ({'domain': domain,
+                            'tax':    key,
+                            'sum':    total[key]});
+                    
+        return result
+
+    #
+    # Apply payment to invoice and reduce the appropriate items
+    #
+    def applyPayment (self, database, payment_id):
+
+        #
+        # Subtract payment amount from invoice sum. Because the sum is split
+        # up in (a) domains (services, products, medication, ) and (b) in
+        # 7% and 19% tax, the different lists have to be reduces one by one.
+        #
+        
+        pass
+    
 #---------------------------------------------------------------------
 # CLASS DatevEntry
 #---------------------------------------------------------------------
@@ -622,12 +648,25 @@ with zipfile.ZipFile (filename) as zip:
 #
 invoices = {}
 
-for id in database.range ("invoices"):
-    if database.get ("invoices", id, "status") == "complete":
-        invoices[id] = Invoice (database, id)
+for invoice_id in database.range ("invoices"):
+    if database.get ("invoices", invoice_id, "status") == "complete":
+        #
+        # Generate complete invoice information
+        #
+        invoice = Invoice (database, invoice_id)
 
+        #
+        # Reduce invoice by payments already performed in previous month
+        #
+        for payment_id in database.range ("payments"):
+            if database.get ("payments", payment_id, "invoice_id") == invoice_id:
+                invoice.applyPayment (database, payment_id)
+        
+        invoices[invoice_id] = invoice
+
+        
 #
-# Process payment list for the given month
+# Process payment list for the given month to generate DATEV file
 #
 datev = []
 
