@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #-------------------------------------------------------------------------------------------------
 # datevexport.py - Export monthly DATEV table from InBehandlung backup file database
 #
@@ -25,6 +26,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #-------------------------------------------------------------------------------------------------
 
+import codecs
 import copy
 import csv
 import datetime
@@ -880,7 +882,7 @@ for invoice_id in database.range ('invoices'):
                 if payment_invoice_id and (payment_invoice_id == invoice_id):
                     date = stringToDate (database.get ('payments', payment_id, 'date'))
                 
-                    if date.year <= year and date.month < month:
+                    if (date.year < year) or (date.year == year and date.month < month):
                         invoice.applyPayment (database, payment_id)
 
         if False:
@@ -965,3 +967,37 @@ with open (output, 'w', newline='') as file:
     
     for entry in datev:
         writer.writerow (entry.toDatev ())
+
+#
+# Generate some additional information
+#
+petty_cash = 0.0
+turnover   = 0.0
+
+for payment_id in database.range ('payments'):
+    
+    if not database.get ('payments', payment_id, 'deleted'):
+        amount = roundEuro (float (database.get ('payments', payment_id, 'amount')))
+        date = stringToDate (database.get ('payments', payment_id, 'date'))
+        
+
+        #
+        # Petty cash
+        #
+        if database.get ('payments', payment_id, 'method') == 'cash':
+            if (date.year < year) or (date.year == year and date.month <= month):
+                petty_cash += amount
+
+        #
+        # Turnover
+        #
+        if database.get ('payments', payment_id, 'invoice_id'):
+            if date.year == year and date.month == month:
+                turnover += amount
+
+print ('Umsatz  : {:.2f} Euro'.format (turnover))
+print ('Barkasse: {:.2f} Euro'.format (petty_cash))
+
+            
+
+
