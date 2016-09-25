@@ -681,7 +681,7 @@ class DatevEntry:
         # Everything else, including EC card payments,  goes into the main account.
         #
         if self._payment_kind == 'bill':
-            self._account_to = Accounts.Bank
+            self._account_to = Accounts.Transfer
         else:
             self._account_to = Accounts.Main
         
@@ -769,7 +769,6 @@ class DatevEntry:
             raise "Unknown payment type '{}'".format (self._payment_kind)
         
         row[self.getColumn ('buchungstyp')]        = self._payment_type
-        row[self.getColumn ('leistungsdatum')]     = self._item_date.strftime ('%d%m%Y')
         row[self.getColumn ('gesellschaftername')] = self._responsible
         row[self.getColumn ('sachverhalt')]        = self._item_kind
 
@@ -796,6 +795,10 @@ class DatevEntry:
         if self._remarks:
             row[self.getColumn ('beleginfo_art_6')]    = 'Bemerkungen'
             row[self.getColumn ('beleginfo_inhalt_6')] = self._remarks
+
+        if self._item_date:
+            row[self.getColumn ('beleginfo_art_7')]    = 'Leistungsdatum'
+            row[self.getColumn ('beleginfo_inhalt_7')] = self._item_date.strftime ('%d%m%Y')
 
         return row
 
