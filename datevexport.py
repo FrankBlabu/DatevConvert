@@ -822,14 +822,18 @@ database = Database ()
 #
 # Parse command line arguments
 #
-if len (sys.argv) != 5:
-    sys.stderr.write ('Format: ' + sys.argv[0] + ' <backup zip file> <month (MM)> <year (YYYY)> <output file>')
+if len (sys.argv) != 5 and len (sys.argv) != 6:
+    sys.stderr.write ('Format: ' + sys.argv[0] + ' <backup zip file> <month (MM)> <year (YYYY)> <output file> [crosscheck file]')
     sys.exit (1)
 
 filename = sys.argv[1]
 month    = int (sys.argv[2])
 year     = int (sys.argv[3])
 output   = sys.argv[4]
+
+crosscheck = None
+if len (sys.argv) > 5:
+    crosscheck = sys.argv[5]
     
 #
 # Read relevant CSV files from backup ZIP file into database
@@ -854,6 +858,9 @@ with zipfile.ZipFile (filename) as zip:
         elif (entry.endswith ('tax.csv')):
             with zip.open (entry, 'rU') as file:
                 database.add (file, 'tax')
+        elif (entry.endswith ('clients.csv')):
+            with zip.open (entry, 'rU') as file:
+                database.add (file, 'clients')
 
 #
 # Generate invoice handling instances
@@ -971,6 +978,60 @@ with open (output, 'w', newline='') as file:
     for entry in datev:
         writer.writerow (entry.toDatev ())
 
+#
+# Generate crosscheck table if requested
+#
+if crosscheck != None:
+
+    ec_payments = []
+    bill_payments = []
+    
+    for payment_id in database.range ('payments'):
+
+        #
+        # Use only payments for the processed invoice and skip cancelled payments at all
+        #
+        if not database.get ('payments', payment_id, 'deleted'):
+            amount = roundEuro (float (database.get ('payments', payment_id, 'amount')))
+            date = stringToDate (database.get ('payments', payment_id, 'date'))
+            method = database.get ('payments', payment_id, 'method')
+
+            if date.year == year and date.month == month:
+
+                amount = locale.format ('%.2f', abs (amount))
+                date = date.strftime ('%d-%m-%Y')
+                bill_number = None
+                name = None
+                
+                invoice_id = database.get ('payments', payment_id, 'invoice_id')
+                if invoice_id:
+                    bill_number = database.get ('invoices', invoice_id, 'number')
+                    client_id = database.get ('invoices', invoice_id, 'client_id')
+
+                    if client_id:
+                        name = database.get ('clients', client_id, 'lastname')
+
+                if method == 'ec':
+                    ec_payments.append ([date, amount, 'EC Karte', bill_number, name])
+                elif method == 'bill':
+                    bill_payments.append ([date, amount, 'Überweisung', bill_number, name])
+
+    ec_payments.sort (key=lambda row: row[0])
+    bill_payments.sort (key=lambda row: row[0])
+                    
+    with open (crosscheck, 'w', newline='') as file:
+        writer = csv.writer (file, dialect='datev')
+
+        writer.writerow (['Datum', 'Betrag', 'Zahlweise', 'Rechnungsnummer', 'Name'])
+    
+        for payment in ec_payments:
+            writer.writerow (payment)
+
+        for payment in bill_payments:
+            writer.writerow (payment)
+
+                    
+        
 #
 # Generate some additional information
 #
