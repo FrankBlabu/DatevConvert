@@ -431,7 +431,10 @@ class Invoice:
         if False:
             print ('  --> total (invoice): ' + str (self._total) + ', sum (parts): ' + str (total))
 
-        assert roundEuro (self._total) == roundEuro (total)
+        if roundEuro (self._total) != roundEuro (total):
+            print ('ERROR: Parts of invoice ' + str (id) + " to not sum up. Total is " +
+                   str (roundEuro (self._total)) + ", sum is " +
+                   str (total) + ".")
 
     #
     # Sum content of a database file belonging to a given invoice id
@@ -487,7 +490,7 @@ class Invoice:
 
                     if not tax_id in total:
                         total[tax_id] = 0.0
-                    
+
                     total[tax_id] += roundEuro (amount * factor * count * price)
 
                     if False:
@@ -585,7 +588,7 @@ class Invoice:
         elif domain == 'services':
             account = Accounts.Services_19 if tax == 19.0 else Accounts.Services_7
         else:
-            raise "Unknown domain '{}'".format (domain)
+            raise "Unknown database domain '{}'".format (domain)
 
         return account
 
