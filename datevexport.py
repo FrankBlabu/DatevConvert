@@ -577,7 +577,7 @@ class Invoice:
         #
         # Hard coced assertion necessary here to map the tax ids to account numbers
         #
-        assert tax == 19.0 or tax == 7.0
+        assert tax == 19.0 or tax == 7.0 or tax == 0.0
             
         if domain == 'products':
             account = Accounts.Products_19 if tax == 19.0 else Accounts.Products_7
@@ -710,17 +710,26 @@ class DatevEntry:
     # Setup counter entry for moving another payment via ec card onto a
     # special account for accounting purposes
     #
-    def setupECCounterEntry (self, database, invoice_id):
-        self._invoice_id       = database.get ('invoices', invoice_id, 'number')
-        self._invoice_date     = database.get ('invoices', invoice_id, 'date')
-        self._customer_id      = database.get ('invoices', invoice_id, 'client_id')
+    def setupECCounterEntry (self, database, payment_id, invoice_id):
+        if invoice_id != '':
+            self._invoice_id       = database.get ('invoices', invoice_id, 'number')
+            self._invoice_date     = database.get ('invoices', invoice_id, 'date')
+            self._customer_id      = database.get ('invoices', invoice_id, 'client_id')
+            self._item_description = 'Übertrag EC-Karten-Zahlung {}'.format (self._invoice_id)
+            self._remarks          = 'Übertrag EC-Karten-Zahlung'
+        else:
+            self._invoice_id       = None
+            self._invoice_date     = database.get ('payments', payment_id, 'date')
+            self._customer_id      = None
+            self._item_description = 'Übertrag EC-Karten-Zahlung OHNE RECHNUNG (z.B. Mahngebühr)'
+            self._remarks          = 'Übertrag EC-Karten-Zahlung: {}' \
+                                     .format (database.get ('payments', payment_id, 'notes'))
+            
         self._amount           = -1.0 * self._amount
         self._account_from     = Accounts.EC
         self._account_to       = Accounts.Main
         self._payment_type     = 'Umbuchung'
-        self._remarks          = 'Übertrag EC-Karten-Zahlung'
         self._item_kind        = 'Umbuchung'
-        self._item_description = 'Übertrag EC-Karten-Zahlung {}'.format (self._invoice_id)
 
     #
     # Query database for payment entry (shortcut)
@@ -755,6 +764,8 @@ class DatevEntry:
             row[self.getColumn ('bu_schluessel')] = 3
         elif float (self._item_tax) == 7.0:
             row[self.getColumn ('bu_schluessel')] = 2
+        elif float (self._item_tax) == 0.0:
+            row[self.getColumn ('bu_schluessel')] = None
         else:
             raise "Unknown tax level '{}'".format (self._item_tax)
 
@@ -957,11 +968,13 @@ for payment_id in database.range ('payments'):
                     datev.append (entry)
 
                 #
-                # In case of EC card payments, setup additional counter entry
+                # In case of EC card payments, setup additional counter entry. Exception exists, like
+                # 'Mahngebuehren' which have to be entered manually and separately without having an
+                # invoice.
                 #
                 if database.get ('payments', payment_id, 'method') == 'ec':
                     entry = DatevEntry (database, payment_id)
-                    entry.setupECCounterEntry (database, invoice_id)
+                    entry.setupECCounterEntry (database, payment_id, invoice_id)
                     datev.append (entry)
 
 
