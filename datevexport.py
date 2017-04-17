@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 #-------------------------------------------------------------------------------------------------
 # datevexport.py - Export monthly DATEV table from InBehandlung backup file database
@@ -26,6 +27,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #-------------------------------------------------------------------------------------------------
 
+import argparse
 import codecs
 import copy
 import csv
@@ -826,7 +828,7 @@ class DatevEntry:
 #
 # German locale for '1,23' like decimal points
 #
-locale.setlocale (locale.LC_ALL, "German")
+locale.setlocale (locale.LC_ALL, "de_DE.UTF-8")
 
 #
 # Database instance containg everything which was read
@@ -836,18 +838,27 @@ database = Database ()
 #
 # Parse command line arguments
 #
-if len (sys.argv) != 5 and len (sys.argv) != 6:
-    sys.stderr.write ('Format: ' + sys.argv[0] + ' <backup zip file> <month (MM)> <year (YYYY)> <output file> [crosscheck file]')
-    sys.exit (1)
+parser = argparse.ArgumentParser ()
 
-filename = sys.argv[1]
-month    = int (sys.argv[2])
-year     = int (sys.argv[3])
-output   = sys.argv[4]
+parser.add_argument ('file',               type=str, help='Name of backup ZIP file')
+parser.add_argument ('-m', '--month',      type=int, help='Month (MM)')
+parser.add_argument ('-y', '--year',       type=int, help='Year (YYYY)')
+parser.add_argument ('-o', '--output',     type=str, help='Name of the output file')
+parser.add_argument ('-c', '--crosscheck', type=str, help='Name of the crosscheck file')       
 
-crosscheck = None
-if len (sys.argv) > 5:
-    crosscheck = sys.argv[5]
+args = parser.parse_args ()
+
+filename   = args.file
+month      = args.month
+year       = args.year
+output     = args.output
+crosscheck = args.crosscheck
+
+assert len (filename) > 0
+assert month >= 1 and month <= 12
+assert year >= 2000
+assert len (output) > 0
+
     
 #
 # Read relevant CSV files from backup ZIP file into database
@@ -1019,6 +1030,7 @@ if crosscheck != None:
                 bill_number = None
                 name = None
                 
+
                 invoice_id = database.get ('payments', payment_id, 'invoice_id')
                 if invoice_id:
                     bill_number = database.get ('invoices', invoice_id, 'number')
