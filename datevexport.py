@@ -866,26 +866,29 @@ assert len (output) > 0
 #
 with zipfile.ZipFile (filename) as zip:
     for entry in zip.namelist ():
+
+        print (entry)
+
         if (entry.endswith ('invoices.csv')):
-            with zip.open (entry, 'rU') as file:
+            with zip.open (entry, 'r') as file:
                 database.add (file, 'invoices')
         elif (entry.endswith ('invoice_medication.csv')):
-            with zip.open (entry, 'rU') as file:
+            with zip.open (entry, 'r') as file:
                 database.add (file, 'invoice_medication')
         elif (entry.endswith ('invoice_product.csv')):
-            with zip.open (entry, 'rU') as file:
+            with zip.open (entry, 'r') as file:
                 database.add (file, 'invoice_product')
         elif (entry.endswith ('invoice_service.csv')):
-            with zip.open (entry, 'rU') as file:
+            with zip.open (entry, 'r') as file:
                 database.add (file, 'invoice_service')
         elif (entry.endswith ('payments.csv')):
-            with zip.open (entry, 'rU') as file:
+            with zip.open (entry, 'r') as file:
                 database.add (file, 'payments')
         elif (entry.endswith ('tax.csv')):
-            with zip.open (entry, 'rU') as file:
+            with zip.open (entry, 'r') as file:
                 database.add (file, 'tax')
         elif (entry.endswith ('clients.csv')):
-            with zip.open (entry, 'rU') as file:
+            with zip.open (entry, 'r') as file:
                 database.add (file, 'clients')
 
 #
